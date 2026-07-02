@@ -1,8 +1,12 @@
 import os
 import sys
+import json
+import time
+import socket
 import asyncio
 import subprocess
 import threading
+from datetime import datetime
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
@@ -18,6 +22,10 @@ DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 os.makedirs(STATIC_DIR, exist_ok=True)
+
+# History config
+HISTORY_FILE = os.path.join(BASE_DIR, "history.json")
+history_lock = threading.Lock()
 
 # Mount static files
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -48,6 +56,34 @@ class DownloadRequest(BaseModel):
     items: List[DownloadItem]
     format: str  # "audio" or "video"
     quality: str  # "low", "medium", "high", "highest"
+    playlist_title: Optional[str] = None
+    playlist_url: Optional[str] = None
+
+# History Helpers
+def load_history():
+    if not os.path.exists(HISTORY_FILE):
+        return []
+    try:
+        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_history(history):
+    try:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
+
+def update_history_item(job_id: str, completed_count: int):
+    with history_lock:
+        history = load_history()
+        for item in history:
+            if item.get("id") == job_id:
+                item["completed_tracks"] = completed_count
+                break
+        save_history(history)
 
 @app.get("/")
 async def read_index():
@@ -114,7 +150,7 @@ async def fetch_info(req: FetchRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def run_download_sync(request: DownloadRequest):
+def run_download_sync(request: DownloadRequest, job_id: str):
     global download_state
     
     with progress_lock:
@@ -149,6 +185,8 @@ def run_download_sync(request: DownloadRequest):
                 download_state["percentage"] = 100.0
                 download_state["logs"].append(f"Finished downloading: {download_state['current_title']}")
 
+    completed_count = 0
+
     for idx, item in enumerate(request.items):
         with progress_lock:
             download_state["current_index"] = idx + 1
@@ -162,6 +200,8 @@ def run_download_sync(request: DownloadRequest):
             'no_warnings': True,
             'progress_hooks': [progress_hook],
             'outtmpl': os.path.join(DOWNLOAD_DIR, '%(title)s.%(ext)s'),
+            'download_archive': os.path.join(DOWNLOAD_DIR, 'download_archive.txt'),
+            'nooverwrites': True,
         }
 
         if request.format == "audio":
@@ -196,11 +236,15 @@ def run_download_sync(request: DownloadRequest):
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([item.url])
+            completed_count += 1
+            update_history_item(job_id, completed_count)
         except Exception as e:
             error_str = f"Error downloading {item.title}: {str(e)}"
             with progress_lock:
                 download_state["logs"].append(error_str)
-                # Keep going with other tracks, don't crash entirely
+            # Even on failure, count it as processed in queue to increment progress
+            completed_count += 1
+            update_history_item(job_id, completed_count)
             continue
 
     with progress_lock:
@@ -213,16 +257,36 @@ async def start_download(req: DownloadRequest, background_tasks: BackgroundTasks
     if download_state["status"] == "downloading":
         raise HTTPException(status_code=400, detail="A download is already in progress")
     
-    background_tasks.add_task(run_download_sync, req)
-    return {"message": "Download started"}
+    # Create history entry
+    job_id = f"job_{int(time.time())}"
+    timestamp = datetime.now().isoformat()
+    
+    title = req.playlist_title or (req.items[0].title if req.items else "Single Video")
+    url = req.playlist_url or (req.items[0].url if req.items else "")
+    
+    new_entry = {
+        "id": job_id,
+        "title": title,
+        "url": url,
+        "timestamp": timestamp,
+        "total_tracks": len(req.items),
+        "completed_tracks": 0,
+        "format": req.format,
+        "quality": req.quality
+    }
+    
+    with history_lock:
+        history = load_history()
+        history.insert(0, new_entry) # Put newest first
+        save_history(history)
+        
+    background_tasks.add_task(run_download_sync, req, job_id)
+    return {"message": "Download started", "job_id": job_id}
 
 @app.get("/api/progress")
 async def get_progress_stream():
     async def event_generator():
-        last_index = -1
-        last_percent = -1.0
         last_status = ""
-        
         while True:
             await asyncio.sleep(0.5)
             with progress_lock:
@@ -236,7 +300,6 @@ async def get_progress_stream():
                 total = download_state["total_files"]
                 err = download_state["error_message"]
 
-            import json
             payload = {
                 "status": status,
                 "current_index": curr_idx,
@@ -245,18 +308,28 @@ async def get_progress_stream():
                 "percentage": percent,
                 "speed": speed,
                 "eta": eta,
-                "logs": logs[-15:], # Keep last 15 lines of logs for UI performance
+                "logs": logs[-15:],
                 "error": err
             }
             yield f"data: {json.dumps(payload)}\n\n"
             
             if status in ["completed", "failed", "idle"] and last_status == status:
-                # If we've reached a terminal state and already pushed it, we can break.
                 break
                 
             last_status = status
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@app.get("/api/history")
+async def get_history():
+    with history_lock:
+        return load_history()
+
+@app.post("/api/history/clear")
+async def clear_history():
+    with history_lock:
+        save_history([])
+    return {"message": "History cleared"}
 
 @app.post("/api/open-folder")
 async def open_folder():

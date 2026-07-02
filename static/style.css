@@ -758,3 +758,99 @@ input[type="checkbox"]:checked::before {
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.2);
 }
+
+/* History Modal Styles */
+.history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 0.5rem 0;
+}
+
+.history-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+    transition: var(--transition);
+}
+
+.history-card:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.history-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+    flex-grow: 1;
+}
+
+.history-info .h-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.history-info .h-meta {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.history-info .h-time {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.history-status-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-shrink: 0;
+}
+
+.history-progress-text {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--neon-blue);
+    font-family: var(--font-mono);
+}
+
+.history-badge {
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    display: inline-block;
+}
+
+.badge-audio {
+    background: rgba(0, 168, 255, 0.1);
+    color: var(--neon-blue);
+    border: 1px solid rgba(0, 168, 255, 0.2);
+}
+
+.badge-video {
+    background: rgba(156, 39, 176, 0.1);
+    color: var(--neon-purple);
+    border: 1px solid rgba(156, 39, 176, 0.2);
+}
+
+.badge-quality {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+

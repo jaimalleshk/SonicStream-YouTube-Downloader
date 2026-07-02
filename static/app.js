@@ -33,6 +33,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const modalOpenFolderBtn = document.getElementById("modalOpenFolderBtn");
     const openFolderBtn = document.getElementById("openFolderBtn");
 
+    // History elements
+    const historyBtn = document.getElementById("historyBtn");
+    const historyModal = document.getElementById("historyModal");
+    const closeHistoryModalBtn = document.getElementById("closeHistoryModalBtn");
+    const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+    const historyList = document.getElementById("historyList");
+
     // Global Caches
     let playlistItems = [];
     let currentEventSource = null;
@@ -49,19 +56,14 @@ document.addEventListener("DOMContentLoaded", () => {
         return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
 
-    // Format Toggle behavior (Audio vs Video quality label switching)
-    formatLabels.forEach(label => {
-        label.addEventListener("click", (e) => {
-            // Find parent label if child icon/span clicked
-            const target = e.currentTarget;
+    // Format Toggle change listeners
+    const formatRadios = document.querySelectorAll('input[name="format"]');
+    formatRadios.forEach(radio => {
+        radio.addEventListener("change", (e) => {
             formatLabels.forEach(l => l.classList.remove("active"));
-            target.classList.add("active");
-            
-            const radio = target.querySelector("input");
-            radio.checked = true;
-            
-            const format = radio.value;
-            toggleQualityLabels(format);
+            const activeLabel = e.target.closest(".toggle-option");
+            if (activeLabel) activeLabel.classList.add("active");
+            toggleQualityLabels(e.target.value);
         });
     });
 
@@ -78,13 +80,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Quality selection cards styling toggle
-    qualityCards.forEach(card => {
-        card.addEventListener("click", (e) => {
-            const target = e.currentTarget;
+    // Quality Cards selection change listeners
+    const qualityRadios = document.querySelectorAll('input[name="quality"]');
+    qualityRadios.forEach(radio => {
+        radio.addEventListener("change", (e) => {
             qualityCards.forEach(c => c.classList.remove("active"));
-            target.classList.add("active");
-            target.querySelector("input").checked = true;
+            const activeCard = e.target.closest(".quality-card");
+            if (activeCard) activeCard.classList.add("active");
         });
     });
 
@@ -242,6 +244,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const format = document.querySelector('input[name="format"]:checked').value;
         const quality = document.querySelector('input[name="quality"]:checked').value;
+        
+        const playlistTitleVal = playlistTitle.textContent;
+        const playlistUrlVal = urlInput.value.trim();
 
         // Reset and prepare progress modal
         progressModal.classList.remove("hidden");
@@ -264,7 +269,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 body: JSON.stringify({
                     items: selected,
                     format,
-                    quality
+                    quality,
+                    playlist_title: playlistTitleVal,
+                    playlist_url: playlistUrlVal
                 })
             });
 
@@ -348,7 +355,6 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         currentEventSource.onerror = (e) => {
-            // EventSource disconnects when completed, which is handled, but check if we're still downloading
             console.log("SSE Connection update:", e);
         };
     }
@@ -384,14 +390,105 @@ document.addEventListener("DOMContentLoaded", () => {
     openFolderBtn.addEventListener("click", openLocalDownloadsFolder);
     modalOpenFolderBtn.addEventListener("click", openLocalDownloadsFolder);
 
+    // History Modal actions
+    historyBtn.addEventListener("click", openHistoryModal);
+    closeHistoryModalBtn.addEventListener("click", () => {
+        historyModal.classList.add("hidden");
+    });
+    
+    clearHistoryBtn.addEventListener("click", async () => {
+        if (!confirm("Are you sure you want to clear your download history?")) return;
+        try {
+            await fetch("/api/history/clear", { method: "POST" });
+            loadHistoryItems();
+        } catch (e) {
+            console.error("Error clearing history:", e);
+        }
+    });
+
+    async function openHistoryModal() {
+        historyModal.classList.remove("hidden");
+        loadHistoryItems();
+    }
+
+    async function loadHistoryItems() {
+        historyList.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Loading logs...</div>`;
+        try {
+            const res = await fetch("/api/history");
+            const data = await res.json();
+            renderHistory(data);
+        } catch (e) {
+            historyList.innerHTML = `<div style="text-align: center; color: var(--error); padding: 1.5rem;">Failed to load history: ${e.message}</div>`;
+        }
+    }
+
+    function renderHistory(items) {
+        historyList.innerHTML = "";
+        if (!items || items.length === 0) {
+            historyList.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 2rem 0;">No download logs found.</div>`;
+            return;
+        }
+
+        items.forEach(item => {
+            const card = document.createElement("div");
+            card.className = "history-card";
+            
+            const dateStr = new Date(item.timestamp).toLocaleString();
+            
+            card.innerHTML = `
+                <div class="history-info">
+                    <div class="h-title" title="${item.title}">${item.title}</div>
+                    <div class="h-meta">
+                        <span class="history-badge badge-${item.format}">${item.format}</span>
+                        <span class="history-badge badge-quality">${item.quality}</span>
+                        <span class="h-time">${dateStr}</span>
+                    </div>
+                </div>
+                <div class="history-status-container">
+                    <span class="history-progress-text">${item.completed_tracks} / ${item.total_tracks} tracks</span>
+                    <button class="btn btn-secondary btn-sm re-analyze-history-btn" data-url="${item.url}">
+                        Re-analyze
+                    </button>
+                </div>
+            `;
+            
+            card.querySelector(".re-analyze-history-btn").addEventListener("click", (e) => {
+                const url = e.target.getAttribute("data-url");
+                urlInput.value = url;
+                historyModal.classList.add("hidden");
+                analyzeLink();
+            });
+            
+            historyList.appendChild(card);
+        });
+    }
+
     // Helpers for error reporting
     function showError(msg) {
         urlError.textContent = msg;
         urlError.classList.remove("hidden");
     }
 
+    function shadowInputFix() {
+        // Initial sync of styling to reflect default checked radios
+        const initialFormat = document.querySelector('input[name="format"]:checked');
+        if (initialFormat) {
+            const activeLabel = initialFormat.closest(".toggle-option");
+            if (activeLabel) activeLabel.classList.add("active");
+            toggleQualityLabels(initialFormat.value);
+        }
+        const initialQuality = document.querySelector('input[name="quality"]:checked');
+        if (initialQuality) {
+            const activeCard = initialQuality.closest(".quality-card");
+            if (activeCard) activeCard.classList.add("active");
+        }
+    }
+
     function hideError() {
         urlError.textContent = "";
         urlError.classList.add("hidden");
     }
+
+    // Execute shadow fix on startup
+    shadowInputFix();
 });

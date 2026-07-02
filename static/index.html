@@ -27,12 +27,21 @@
                 <span class="logo-text">SonicStream</span>
                 <span class="logo-badge">MVP</span>
             </div>
-            <button class="btn btn-secondary open-folder-btn" id="openFolderBtn">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                </svg>
-                Downloads
-            </button>
+            <div class="header-actions" style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-secondary open-folder-btn" id="historyBtn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    History
+                </button>
+                <button class="btn btn-secondary open-folder-btn" id="openFolderBtn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    Downloads
+                </button>
+            </div>
         </header>
 
         <!-- Main Content -->
@@ -218,6 +227,26 @@
                     </svg>
                     Open Downloads
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Overlay Modal -->
+    <div class="modal-overlay hidden" id="historyModal">
+        <div class="modal" style="max-width: 750px;">
+            <div class="modal-header">
+                <h3>Download History</h3>
+                <button class="btn btn-secondary btn-sm" id="clearHistoryBtn">Clear History</button>
+            </div>
+            
+            <div class="modal-body" style="max-height: 450px; overflow-y: auto;">
+                <div class="history-list" id="historyList">
+                    <!-- History cards inserted dynamically -->
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="closeHistoryModalBtn">Close</button>
             </div>
         </div>
     </div>
