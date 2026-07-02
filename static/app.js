@@ -56,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
 
-    // Format Toggle change listeners
+    // Format Toggle change listeners & click fallbacks
     const formatRadios = document.querySelectorAll('input[name="format"]');
     formatRadios.forEach(radio => {
         radio.addEventListener("change", (e) => {
@@ -64,6 +64,16 @@ document.addEventListener("DOMContentLoaded", () => {
             const activeLabel = e.target.closest(".toggle-option");
             if (activeLabel) activeLabel.classList.add("active");
             toggleQualityLabels(e.target.value);
+        });
+    });
+
+    formatLabels.forEach(label => {
+        label.addEventListener("click", (e) => {
+            const radio = label.querySelector('input[type="radio"]');
+            if (radio && e.target !== radio) {
+                radio.checked = true;
+                radio.dispatchEvent(new Event("change"));
+            }
         });
     });
 
@@ -80,13 +90,23 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Quality Cards selection change listeners
+    // Quality Cards selection change listeners & click fallbacks
     const qualityRadios = document.querySelectorAll('input[name="quality"]');
     qualityRadios.forEach(radio => {
         radio.addEventListener("change", (e) => {
             qualityCards.forEach(c => c.classList.remove("active"));
             const activeCard = e.target.closest(".quality-card");
             if (activeCard) activeCard.classList.add("active");
+        });
+    });
+
+    qualityCards.forEach(card => {
+        card.addEventListener("click", (e) => {
+            const radio = card.querySelector('input[type="radio"]');
+            if (radio && e.target !== radio) {
+                radio.checked = true;
+                radio.dispatchEvent(new Event("change"));
+            }
         });
     });
 
