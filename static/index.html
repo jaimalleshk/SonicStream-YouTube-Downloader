@@ -201,6 +201,16 @@
                         <div class="stat-item">
                             <span class="label">ETA</span>
                             <span class="value" id="progressEta">00:00</span>
+                    </div>
+
+                    <!-- Overall Playlist Progress -->
+                    <div class="playlist-progress-section" style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                        <div class="progress-info" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span class="item-index" style="color: var(--neon-purple);">Total Progress</span>
+                            <span id="totalProgressCount" style="font-size: 0.9rem; font-weight: 600; color: var(--text-secondary);">0 / 0 Completed</span>
+                        </div>
+                        <div class="progress-track" style="height: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 9999px; overflow: hidden;">
+                            <div class="progress-fill" id="totalProgressFill" style="width: 0%; background: linear-gradient(90deg, var(--neon-purple), var(--neon-pink)); box-shadow: 0 0 8px var(--neon-purple); height: 100%;"></div>
                         </div>
                     </div>
                 </div>
@@ -250,5 +260,6 @@
             </div>
         </div>
     </div>
+    <script src="/static/app.js?v=3"></script>
 </body>
 </html>

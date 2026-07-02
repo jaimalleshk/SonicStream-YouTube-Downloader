@@ -333,6 +333,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 progressEta.textContent = data.eta;
             }
 
+            // Update Total Playlist Progress (downloaded vs pending count and overall progress bar)
+            if (data.total_files > 0) {
+                let completed = data.current_index - 1;
+                if (data.status === "completed") {
+                    completed = data.total_files;
+                }
+                const total = data.total_files;
+                const percent = Math.round((completed / total) * 100);
+                
+                const totalProgressFill = document.getElementById("totalProgressFill");
+                const totalProgressCount = document.getElementById("totalProgressCount");
+                
+                if (totalProgressFill) totalProgressFill.style.width = `${percent}%`;
+                if (totalProgressCount) {
+                    totalProgressCount.textContent = `${completed} / ${total} Completed (Pending: ${total - completed})`;
+                }
+            }
+
             // Render logs
             if (data.logs && data.logs.length > 0) {
                 consoleLogs.innerHTML = "";
