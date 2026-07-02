@@ -181,9 +181,11 @@ def run_download_sync(request: DownloadRequest, job_id: str):
                 download_state["speed"] = speed
                 download_state["eta"] = eta
         elif d['status'] == 'finished':
+            info = d.get('info_dict', {})
+            title = info.get('title') or download_state["current_title"]
             with progress_lock:
                 download_state["percentage"] = 100.0
-                download_state["logs"].append(f"Finished downloading: {download_state['current_title']}")
+                download_state["logs"].append(f"Finished downloading: {title}")
 
     completed_count = 0
 
@@ -202,6 +204,7 @@ def run_download_sync(request: DownloadRequest, job_id: str):
             'outtmpl': os.path.join(DOWNLOAD_DIR, '%(title)s.%(ext)s'),
             'download_archive': os.path.join(DOWNLOAD_DIR, 'download_archive.txt'),
             'nooverwrites': True,
+            'noplaylist': True,
         }
 
         if request.format == "audio":

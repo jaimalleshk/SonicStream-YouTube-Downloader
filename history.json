@@ -1,5 +1,15 @@
 [
   {
+    "id": "job_1783036263",
+    "title": "Single Video",
+    "url": "https://www.youtube.com/watch?v=efv3iHUarxY&list=PLcqF0SS4XiHFvtqCcHdDHrKGw_r9aRCak",
+    "timestamp": "2026-07-02T18:51:03.769681",
+    "total_tracks": 1,
+    "completed_tracks": 0,
+    "format": "audio",
+    "quality": "highest"
+  },
+  {
     "id": "job_1783035384",
     "title": "Test Single Video Playlist",
     "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
