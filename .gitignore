@@ -1,0 +1,7 @@
+.venv/
+downloads/
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+*.log

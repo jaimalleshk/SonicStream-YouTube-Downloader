@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SonicStream - YouTube Downloader</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="glass-bg"></div>
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="logo-icon">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span class="logo-text">SonicStream</span>
+                <span class="logo-badge">MVP</span>
+            </div>
+            <button class="btn btn-secondary open-folder-btn" id="openFolderBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+                Downloads
+            </button>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Hero / Input Panel -->
+            <section class="card hero-section">
+                <h1>High-Speed Media Downloader</h1>
+                <p class="subtitle">Extract playlists or single videos into premium audio or video formats instantly.</p>
+                
+                <div class="input-group">
+                    <div class="input-wrapper">
+                        <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="urlInput" placeholder="Paste YouTube Playlist or Video URL here..." autocomplete="off">
+                    </div>
+                    <button class="btn btn-primary" id="analyzeBtn">
+                        <span>Analyze Link</span>
+                        <div class="spinner hidden" id="analyzeSpinner"></div>
+                    </button>
+                </div>
+                <div id="urlError" class="error-msg hidden"></div>
+            </section>
+
+            <!-- Configuration Section -->
+            <section class="config-grid">
+                <!-- Format Panel -->
+                <div class="card config-card">
+                    <h2>Select Format</h2>
+                    <div class="format-toggle">
+                        <label class="toggle-option active" data-value="audio">
+                            <input type="radio" name="format" value="audio" checked>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18V5l12-2v13"></path>
+                                <circle cx="6" cy="18" r="3"></circle>
+                                <circle cx="18" cy="16" r="3"></circle>
+                            </svg>
+                            <span>Audio (MP3)</span>
+                        </label>
+                        <label class="toggle-option" data-value="video">
+                            <input type="radio" name="format" value="video">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                                <line x1="7" y1="2" x2="7" y2="22"></line>
+                                <line x1="17" y1="2" x2="17" y2="22"></line>
+                                <line x1="2" y1="12" x2="22" y2="12"></line>
+                                <line x1="2" y1="7" x2="7" y2="7"></line>
+                                <line x1="2" y1="17" x2="7" y2="17"></line>
+                                <line x1="17" y1="17" x2="22" y2="17"></line>
+                                <line x1="17" y1="7" x2="22" y2="7"></line>
+                            </svg>
+                            <span>Video (MP4)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Quality Panel -->
+                <div class="card config-card">
+                    <h2>Select Quality</h2>
+                    <div class="quality-grid">
+                        <label class="quality-card" data-quality="low">
+                            <input type="radio" name="quality" value="low">
+                            <span class="q-title">Low</span>
+                            <span class="q-detail" id="qAudioLow">64 kbps</span>
+                            <span class="q-detail-vid hidden" id="qVideoLow">360p / Worst</span>
+                        </label>
+                        <label class="quality-card active" data-quality="medium">
+                            <input type="radio" name="quality" value="medium" checked>
+                            <span class="q-title">Medium</span>
+                            <span class="q-detail" id="qAudioMedium">128 kbps</span>
+                            <span class="q-detail-vid hidden" id="qVideoMedium">480p / SD</span>
+                        </label>
+                        <label class="quality-card" data-quality="high">
+                            <input type="radio" name="quality" value="high">
+                            <span class="q-title">High</span>
+                            <span class="q-detail" id="qAudioHigh">192 kbps</span>
+                            <span class="q-detail-vid hidden" id="qVideoHigh">720p / HD</span>
+                        </label>
+                        <label class="quality-card" data-quality="highest">
+                            <input type="radio" name="quality" value="highest">
+                            <span class="q-title">Highest</span>
+                            <span class="q-detail" id="qAudioHighest">320 kbps</span>
+                            <span class="q-detail-vid hidden" id="qVideoHighest">1080p / Best</span>
+                        </label>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Playlist/Video Items List -->
+            <section class="card playlist-section hidden" id="playlistSection">
+                <div class="playlist-header">
+                    <div>
+                        <h2 id="playlistTitle">YouTube Playlist</h2>
+                        <p class="meta" id="playlistMeta">0 items selected</p>
+                    </div>
+                    <div class="playlist-actions">
+                        <button class="btn btn-secondary btn-sm" id="selectAllBtn">Select All</button>
+                        <button class="btn btn-secondary btn-sm" id="deselectAllBtn">Deselect All</button>
+                        <button class="btn btn-primary" id="downloadBtn">Download Selected</button>
+                    </div>
+                </div>
+
+                <div class="search-filter">
+                    <input type="text" id="playlistSearch" placeholder="Filter videos by title or channel...">
+                </div>
+
+                <div class="playlist-table-wrapper">
+                    <table class="playlist-table">
+                        <thead>
+                            <tr>
+                                <th width="40"><input type="checkbox" id="headerCheckbox"></th>
+                                <th width="120">Thumbnail</th>
+                                <th>Video Info</th>
+                                <th width="150">Channel</th>
+                                <th width="100">Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="playlistTableBody">
+                            <!-- Items inserted dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Live Progress Overlay Modal -->
+    <div class="modal-overlay hidden" id="progressModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Downloading Media</h3>
+                <span class="status-badge pulse" id="downloadBadge">Downloading</span>
+            </div>
+            
+            <div class="modal-body">
+                <div class="progress-details">
+                    <div class="progress-info">
+                        <span class="item-index" id="progressIndex">Item 0 of 0</span>
+                        <span class="item-title" id="progressTitle">Current Video Title</span>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div class="progress-track">
+                        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                    </div>
+                    
+                    <div class="progress-stats">
+                        <div class="stat-item">
+                            <span class="label">Progress</span>
+                            <span class="value" id="progressPercent">0%</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">Speed</span>
+                            <span class="value" id="progressSpeed">0 KB/s</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">ETA</span>
+                            <span class="value" id="progressEta">00:00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Console Logs panel -->
+                <div class="terminal-logs">
+                    <div class="terminal-header">
+                        <span>Console Output</span>
+                        <div class="mac-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+                    <div class="terminal-body" id="consoleLogs">
+                        <p class="system-line">Ready to download...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary hidden" id="closeModalBtn">Dismiss</button>
+                <button class="btn btn-primary hidden" id="modalOpenFolderBtn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    Open Downloads
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
