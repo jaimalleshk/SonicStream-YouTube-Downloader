@@ -43,7 +43,9 @@ download_state = {
     "speed": "0 KB/s",
     "eta": "00:00",
     "logs": [],
-    "error_message": ""
+    "error_message": "",
+    "item_states": {},      # Map of item.id -> status, percent, speed, etc.
+    "active_job_num": 0
 }
 
 # Queue Management
@@ -74,6 +76,7 @@ class DownloadRequest(BaseModel):
 def sanitize_filename(filename: str) -> str:
     for char in ['\\', '/', ':', '*', '?', '"', '<', '>', '|']:
         filename = filename.replace(char, '_')
+    filename = filename.rstrip('. ')
     return filename
 
 def check_local_duplicate(title: str, format_type: str, download_dir: str) -> Optional[str]:
@@ -203,12 +206,14 @@ def run_download_job(job_data: dict):
     global download_state, queue_state
     
     job_id = job_data["job_id"]
+    job_num = job_data["job_num"]
     request = job_data["request"]
     
     # Set active job in queue state
     with queue_lock:
         queue_state["active_job"] = {
             "id": job_id,
+            "job_num": job_num,
             "title": job_data["title"],
             "total_tracks": len(request.items),
             "format": request.format,
@@ -216,6 +221,19 @@ def run_download_job(job_data: dict):
         }
         # Remove from pending list
         queue_state["pending_jobs"] = [j for j in queue_state["pending_jobs"] if j["job_id"] != job_id]
+
+    # Initialize item states map for inline updates
+    item_states = {}
+    for item in request.items:
+        item_states[item.id] = {
+            "job_num": job_num,
+            "status": "queued",
+            "percentage": 0.0,
+            "speed": "0 KB/s",
+            "start_time": "--",
+            "end_time": "--",
+            "error_detail": ""
+        }
 
     with progress_lock:
         download_state.update({
@@ -226,30 +244,11 @@ def run_download_job(job_data: dict):
             "percentage": 0.0,
             "speed": "0 KB/s",
             "eta": "00:00",
-            "logs": [f"Starting job: {job_data['title']}"],
-            "error_message": ""
+            "logs": [f"Starting Job #{job_num}: {job_data['title']}"],
+            "error_message": "",
+            "item_states": item_states,
+            "active_job_num": job_num
         })
-
-    def progress_hook(d):
-        global download_state
-        if d['status'] == 'downloading':
-            total = d.get('total_bytes') or d.get('total_bytes_estimate') or 1
-            downloaded = d.get('downloaded_bytes', 0)
-            percent = (downloaded / total) * 100
-            
-            speed = d.get('_speed_str', '0 KB/s')
-            eta = d.get('_eta_str', '00:00')
-            
-            with progress_lock:
-                download_state["percentage"] = round(percent, 1)
-                download_state["speed"] = speed
-                download_state["eta"] = eta
-        elif d['status'] == 'finished':
-            info = d.get('info_dict', {})
-            title = info.get('title') or download_state["current_title"]
-            with progress_lock:
-                download_state["percentage"] = 100.0
-                download_state["logs"].append(f"Finished downloading: {title}")
 
     completed_count = 0
 
@@ -259,8 +258,38 @@ def run_download_job(job_data: dict):
             download_state["current_title"] = item.title
             download_state["percentage"] = 0.0
             download_state["logs"].append(f"[{idx+1}/{len(request.items)}] Preparing: {item.title}")
+            download_state["item_states"][item.id].update({
+                "status": "downloading",
+                "start_time": datetime.now().strftime("%H:%M:%S")
+            })
 
-        # Check for local duplicates first using case-insensitive check and yt-dlp naming logic
+        def progress_hook(d):
+            global download_state
+            if d['status'] == 'downloading':
+                total = d.get('total_bytes') or d.get('total_bytes_estimate') or 1
+                downloaded = d.get('downloaded_bytes', 0)
+                percent = round((downloaded / total) * 100, 1)
+                
+                speed = d.get('_speed_str', '0 KB/s')
+                eta = d.get('_eta_str', '00:00')
+                
+                with progress_lock:
+                    download_state["percentage"] = percent
+                    download_state["speed"] = speed
+                    download_state["eta"] = eta
+                    if item.id in download_state["item_states"]:
+                        download_state["item_states"][item.id].update({
+                            "percentage": percent,
+                            "speed": speed
+                        })
+            elif d['status'] == 'finished':
+                info = d.get('info_dict', {})
+                title = info.get('title') or download_state["current_title"]
+                with progress_lock:
+                    download_state["percentage"] = 100.0
+                    download_state["logs"].append(f"Finished downloading: {title}")
+
+        # Check for local duplicates first
         duplicate_path = check_local_duplicate(item.title, request.format, DOWNLOAD_DIR)
         
         if request.skip_duplicates and duplicate_path:
@@ -268,6 +297,12 @@ def run_download_job(job_data: dict):
             with progress_lock:
                 download_state["percentage"] = 100.0
                 download_state["logs"].append(skip_msg)
+                if item.id in download_state["item_states"]:
+                    download_state["item_states"][item.id].update({
+                        "status": "skipped",
+                        "percentage": 100.0,
+                        "end_time": datetime.now().strftime("%H:%M:%S")
+                    })
             completed_count += 1
             update_history_item(job_id, completed_count)
             continue
@@ -281,7 +316,6 @@ def run_download_job(job_data: dict):
             'download_archive': os.path.join(DOWNLOAD_DIR, 'download_archive.txt'),
             'nooverwrites': True,
             'noplaylist': True,
-            # Embed metadata and album artwork options
             'writethumbnail': True,
         }
 
@@ -349,12 +383,25 @@ def run_download_job(job_data: dict):
                     time.sleep(2)
         
         if success:
+            with progress_lock:
+                if item.id in download_state["item_states"]:
+                    download_state["item_states"][item.id].update({
+                        "status": "completed",
+                        "percentage": 100.0,
+                        "end_time": datetime.now().strftime("%H:%M:%S")
+                    })
             completed_count += 1
             update_history_item(job_id, completed_count)
         else:
             error_str = f"Error downloading {item.title} after {max_retries} attempts: {error_msg}"
             with progress_lock:
                 download_state["logs"].append(error_str)
+                if item.id in download_state["item_states"]:
+                    download_state["item_states"][item.id].update({
+                        "status": "error",
+                        "end_time": datetime.now().strftime("%H:%M:%S"),
+                        "error_detail": error_msg
+                    })
             completed_count += 1
             update_history_item(job_id, completed_count)
 
@@ -387,32 +434,39 @@ worker_thread.start()
 
 @app.post("/api/download")
 async def start_download(req: DownloadRequest):
-    # Create history entry
+    # Get incremental job number from history
     job_id = f"job_{int(time.time())}"
     timestamp = datetime.now().isoformat()
     
     title = req.playlist_title or (req.items[0].title if req.items else "Single Video")
     url = req.playlist_url or (req.items[0].url if req.items else "")
-    
-    new_entry = {
-        "id": job_id,
-        "title": title,
-        "url": url,
-        "timestamp": timestamp,
-        "total_tracks": len(req.items),
-        "completed_tracks": 0,
-        "format": req.format,
-        "quality": req.quality
-    }
-    
+
     with history_lock:
         history = load_history()
+        max_job_num = 0
+        for h_item in history:
+            if "job_num" in h_item:
+                max_job_num = max(max_job_num, h_item["job_num"])
+        new_job_num = max_job_num + 1
+
+        new_entry = {
+            "id": job_id,
+            "job_num": new_job_num,
+            "title": title,
+            "url": url,
+            "timestamp": timestamp,
+            "total_tracks": len(req.items),
+            "completed_tracks": 0,
+            "format": req.format,
+            "quality": req.quality
+        }
         history.insert(0, new_entry)
         save_history(history)
 
     # Push to task queue
     job_data = {
         "job_id": job_id,
+        "job_num": new_job_num,
         "title": title,
         "request": req
     }
@@ -421,7 +475,7 @@ async def start_download(req: DownloadRequest):
         queue_state["pending_jobs"].append(job_data)
         
     download_queue.put(job_data)
-    return {"message": "Job queued successfully", "job_id": job_id}
+    return {"message": "Job queued successfully", "job_id": job_id, "job_num": new_job_num}
 
 @app.get("/api/queue")
 async def get_queue():
@@ -431,6 +485,7 @@ async def get_queue():
             "pending_jobs": [
                 {
                     "id": j["job_id"],
+                    "job_num": j["job_num"],
                     "title": j["title"],
                     "total_tracks": len(j["request"].items),
                     "format": j["request"].format,
@@ -455,6 +510,8 @@ async def get_progress_stream():
                 logs = list(download_state["logs"])
                 total = download_state["total_files"]
                 err = download_state["error_message"]
+                item_states = dict(download_state["item_states"])
+                active_job_num = download_state["active_job_num"]
 
             payload = {
                 "status": status,
@@ -465,13 +522,13 @@ async def get_progress_stream():
                 "speed": speed,
                 "eta": eta,
                 "logs": logs[-15:],
-                "error": err
+                "error": err,
+                "item_states": item_states,
+                "active_job_num": active_job_num
             }
             yield f"data: {json.dumps(payload)}\n\n"
             
             if status in ["completed", "failed"] and last_status == status:
-                # Instead of shutting down the stream permanently, we break when the current active job finishes.
-                # The client will reconnect when a new active job starts.
                 break
                 
             last_status = status
@@ -556,25 +613,32 @@ async def resume_job(req: ResumeRequest):
         # 4. Trigger download (push to queue)
         job_id = f"job_{int(time.time())}"
         
-        # Insert a new entry so they see the resumption attempt history
-        new_entry = {
-            "id": job_id,
-            "title": f"[Resumed] {job.get('title')}",
-            "url": url,
-            "timestamp": datetime.now().isoformat(),
-            "total_tracks": len(entries),
-            "completed_tracks": 0,
-            "format": job.get("format", "audio"),
-            "quality": job.get("quality", "highest")
-        }
-        
         with history_lock:
             history = load_history()
+            max_job_num = 0
+            for h_item in history:
+                if "job_num" in h_item:
+                    max_job_num = max(max_job_num, h_item["job_num"])
+            new_job_num = max_job_num + 1
+            
+            # Insert a new entry so they see the resumption attempt history
+            new_entry = {
+                "id": job_id,
+                "job_num": new_job_num,
+                "title": f"[Resumed] {job.get('title')}",
+                "url": url,
+                "timestamp": datetime.now().isoformat(),
+                "total_tracks": len(entries),
+                "completed_tracks": 0,
+                "format": job.get("format", "audio"),
+                "quality": job.get("quality", "highest")
+            }
             history.insert(0, new_entry)
             save_history(history)
             
         job_data = {
             "job_id": job_id,
+            "job_num": new_job_num,
             "title": f"[Resumed] {job.get('title')}",
             "request": dl_req
         }
@@ -583,7 +647,7 @@ async def resume_job(req: ResumeRequest):
             queue_state["pending_jobs"].append(job_data)
             
         download_queue.put(job_data)
-        return {"message": "Job resumed and queued", "job_id": job_id}
+        return {"message": "Job resumed and queued", "job_id": job_id, "job_num": new_job_num}
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Resumption failed: {str(e)}")

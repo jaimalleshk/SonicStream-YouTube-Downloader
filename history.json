@@ -1,5 +1,16 @@
 [
   {
+    "id": "job_1783039296",
+    "job_num": 1,
+    "title": "Grid Diagnostic Run",
+    "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "timestamp": "2026-07-02T19:41:36.863717",
+    "total_tracks": 1,
+    "completed_tracks": 1,
+    "format": "audio",
+    "quality": "highest"
+  },
+  {
     "id": "job_1783038619",
     "title": "Single Video",
     "url": "https://www.youtube.com/watch?v=efv3iHUarxY&list=PLcqF0SS4XiHFvtqCcHdDHrKGw_r9aRCak",

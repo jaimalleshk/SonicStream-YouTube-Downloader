@@ -12,19 +12,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const playlistTitle = document.getElementById("playlistTitle");
     const playlistMeta = document.getElementById("playlistMeta");
     const playlistSearch = document.getElementById("playlistSearch");
+    const statusFilter = document.getElementById("statusFilter");
     const playlistTableBody = document.getElementById("playlistTableBody");
     const headerCheckbox = document.getElementById("headerCheckbox");
     
     const selectAllBtn = document.getElementById("selectAllBtn");
     const deselectAllBtn = document.getElementById("deselectAllBtn");
     const downloadBtn = document.getElementById("downloadBtn");
+    const skipDuplicatesCheckbox = document.getElementById("skipDuplicatesCheckbox");
     
-    const progressIndex = document.getElementById("progressIndex");
-    const progressTitle = document.getElementById("progressTitle");
-    const progressFill = document.getElementById("progressFill");
-    const progressPercent = document.getElementById("progressPercent");
-    const progressSpeed = document.getElementById("progressSpeed");
-    const progressEta = document.getElementById("progressEta");
+    const gridHud = document.getElementById("gridHud");
+    const hudJobTitle = document.getElementById("hudJobTitle");
+    const hudSpeed = document.getElementById("hudSpeed");
+    const hudEta = document.getElementById("hudEta");
+    const hudProgressCount = document.getElementById("hudProgressCount");
     const consoleLogs = document.getElementById("consoleLogs");
     
     const openFolderBtn = document.getElementById("openFolderBtn");
@@ -36,21 +37,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const clearHistoryBtn = document.getElementById("clearHistoryBtn");
     const historyList = document.getElementById("historyList");
 
-    // Queue elements
-    const toggleQueueBtn = document.getElementById("toggleQueueBtn");
-    const queueDrawer = document.getElementById("queueDrawer");
-    const closeDrawerBtn = document.getElementById("closeDrawerBtn");
-    const drawerOpenFolderBtn = document.getElementById("drawerOpenFolderBtn");
-    const queueBadgeCount = document.getElementById("queueBadgeCount");
-    const pendingQueueList = document.getElementById("pendingQueueList");
-    const activeJobSection = document.getElementById("activeJobSection");
-    const activeJobIdleMessage = document.getElementById("activeJobIdleMessage");
-    const skipDuplicatesCheckbox = document.getElementById("skipDuplicatesCheckbox");
-
-    // Global Caches
+    // Global Caches for Interactive Grid Sorting & Live Sync
     let playlistItems = [];
+    let localItemStates = {}; // Map of item.id -> { job_num, status, percentage, speed, start_time, end_time, error_detail }
     let currentEventSource = null;
-    let queuePollInterval = null;
+    let currentSortCol = null;
+    let sortAsc = true;
 
     // Helper: format duration in seconds to MM:SS or H:MM:SS
     function formatDuration(seconds) {
@@ -64,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
 
-    // Format Toggle change listeners & click fallbacks
+    // Format Toggle change listeners
     const formatRadios = document.querySelectorAll('input[name="format"]');
     formatRadios.forEach(radio => {
         radio.addEventListener("change", (e) => {
@@ -98,7 +90,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Quality Cards selection change listeners & click fallbacks
+    // Quality Cards selection
     const qualityRadios = document.querySelectorAll('input[name="quality"]');
     qualityRadios.forEach(radio => {
         radio.addEventListener("change", (e) => {
@@ -139,6 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
         analyzeBtn.disabled = true;
         playlistSection.classList.add("hidden");
         playlistItems = [];
+        localItemStates = {};
 
         try {
             const response = await fetch("/api/fetch-info", {
@@ -154,6 +147,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
             playlistItems = data.entries;
             playlistTitle.textContent = data.title;
+            
+            // Initialize local states cache
+            playlistItems.forEach(item => {
+                localItemStates[item.id] = {
+                    job_num: "--",
+                    status: "queued",
+                    percentage: 0.0,
+                    speed: "--",
+                    start_time: "--",
+                    end_time: "--",
+                    error_detail: ""
+                };
+            });
+
             renderPlaylistTable(playlistItems);
             
             // Auto check all items by default
@@ -176,21 +183,100 @@ document.addEventListener("DOMContentLoaded", () => {
         playlistTableBody.innerHTML = "";
         
         if (items.length === 0) {
-            playlistTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No videos found matching current filter.</td></tr>`;
+            playlistTableBody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-muted); padding: 2rem;">No videos found matching current filter.</td></tr>`;
             return;
         }
 
+        // Sort items array first
+        if (currentSortCol) {
+            items.sort((a, b) => {
+                let valA = "";
+                let valB = "";
+                
+                if (currentSortCol === "title") {
+                    valA = a.title || "";
+                    valB = b.title || "";
+                } else if (currentSortCol === "uploader") {
+                    valA = a.uploader || "";
+                    valB = b.uploader || "";
+                } else if (currentSortCol === "duration") {
+                    valA = a.duration || 0;
+                    valB = b.duration || 0;
+                } else {
+                    const stateA = localItemStates[a.id] || {};
+                    const stateB = localItemStates[b.id] || {};
+                    
+                    if (currentSortCol === "job_num") {
+                        valA = stateA.job_num || 0;
+                        valB = stateB.job_num || 0;
+                    } else if (currentSortCol === "status") {
+                        valA = stateA.percentage || 0;
+                        valB = stateB.percentage || 0;
+                    } else if (currentSortCol === "speed") {
+                        valA = parseFloat(stateA.speed) || 0;
+                        valB = parseFloat(stateB.speed) || 0;
+                    } else if (currentSortCol === "start_time") {
+                        valA = stateA.start_time || "";
+                        valB = stateB.start_time || "";
+                    } else if (currentSortCol === "end_time") {
+                        valA = stateA.end_time || "";
+                        valB = stateB.end_time || "";
+                    } else if (currentSortCol === "status_detail") {
+                        valA = stateA.status || "";
+                        valB = stateB.status || "";
+                    } else if (currentSortCol === "error_detail") {
+                        valA = stateA.error_detail || "";
+                        valB = stateB.error_detail || "";
+                    }
+                }
+                
+                if (typeof valA === "string") {
+                    return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                } else {
+                    return sortAsc ? (valA - valB) : (valB - valA);
+                }
+            });
+        }
+
+        // Render sorted rows
         items.forEach(item => {
+            const state = localItemStates[item.id] || {
+                job_num: "--",
+                status: "queued",
+                percentage: 0.0,
+                speed: "--",
+                start_time: "--",
+                end_time: "--",
+                error_detail: ""
+            };
+
             const row = document.createElement("tr");
+            row.className = "playlist-row";
             row.setAttribute("data-id", item.id);
+            
+            const jobDisplay = state.job_num !== "--" ? `#${state.job_num}` : "--";
+            const speedDisplay = state.speed !== "0 KB/s" ? state.speed : "--";
+            
             row.innerHTML = `
                 <td><input type="checkbox" class="video-checkbox" checked data-id="${item.id}"></td>
                 <td class="thumb-cell"><img src="${item.thumbnail || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=120'}" alt="Thumb"></td>
-                <td>
-                    <div class="title-cell" title="${item.title}">${item.title}</div>
-                </td>
+                <td class="title-cell" title="${item.title}">${item.title}</td>
                 <td class="channel-cell">${item.uploader}</td>
                 <td class="duration-cell">${formatDuration(item.duration)}</td>
+                <td class="job-cell" id="job-${item.id}">${jobDisplay}</td>
+                <td class="status-cell" id="status-col-${item.id}">
+                    <div class="cell-progress-container">
+                        <span id="percent-val-${item.id}" style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono);">${state.percentage}%</span>
+                        <div class="cell-progress-bar">
+                            <div class="cell-progress-fill" id="fill-${item.id}" style="width: ${state.percentage}%;"></div>
+                        </div>
+                    </div>
+                </td>
+                <td class="speed-cell" id="speed-${item.id}">${speedDisplay}</td>
+                <td class="time-cell" id="start-${item.id}">${state.start_time}</td>
+                <td class="time-cell" id="end-${item.id}">${state.end_time}</td>
+                <td><span class="status-detail-cell ${state.status}" id="status-detail-${item.id}">${state.status}</span></td>
+                <td class="error-detail-cell" id="error-${item.id}" title="${state.error_detail}">${state.error_detail || "--"}</td>
             `;
             
             row.querySelector(".video-checkbox").addEventListener("change", () => {
@@ -201,6 +287,9 @@ document.addEventListener("DOMContentLoaded", () => {
             
             playlistTableBody.appendChild(row);
         });
+
+        // Trigger filters in case user sorted while filters were active
+        filterGrid();
     }
 
     // Toggle all checkboxes
@@ -231,7 +320,6 @@ document.addEventListener("DOMContentLoaded", () => {
         updateSelectionMeta();
     });
 
-    // Selection meta count
     function updateSelectionMeta() {
         const checkedCount = getSelectedItems().length;
         playlistMeta.textContent = `${checkedCount} of ${playlistItems.length} items selected`;
@@ -244,22 +332,71 @@ document.addEventListener("DOMContentLoaded", () => {
         return playlistItems.filter(item => selectedIds.includes(item.id));
     }
 
-    // Filter list
-    playlistSearch.addEventListener("input", (e) => {
-        const query = e.target.value.toLowerCase().trim();
-        const rows = playlistTableBody.querySelectorAll("tr");
-        
-        rows.forEach(row => {
-            const title = row.querySelector(".title-cell")?.textContent.toLowerCase() || "";
-            const channel = row.querySelector(".channel-cell")?.textContent.toLowerCase() || "";
+    // Interactive Sorting logic
+    const sortHeaders = document.querySelectorAll("th.sortable");
+    sortHeaders.forEach(th => {
+        th.addEventListener("click", () => {
+            const col = th.getAttribute("data-sort");
+            if (currentSortCol === col) {
+                sortAsc = !sortAsc;
+            } else {
+                currentSortCol = col;
+                sortAsc = true;
+            }
             
-            if (title.includes(query) || channel.includes(query)) {
+            sortHeaders.forEach(h => {
+                h.classList.remove("asc", "desc");
+            });
+            th.classList.add(sortAsc ? "asc" : "desc");
+            
+            renderPlaylistTable(playlistItems);
+        });
+    });
+
+    // Combined Filters: Search + Status dropdown
+    playlistSearch.addEventListener("input", filterGrid);
+    statusFilter.addEventListener("change", filterGrid);
+
+    function filterGrid() {
+        const query = playlistSearch.value.toLowerCase().trim();
+        const status = statusFilter.value;
+        
+        const rows = playlistTableBody.querySelectorAll(".playlist-row");
+        rows.forEach(row => {
+            const id = row.getAttribute("data-id");
+            const item = playlistItems.find(i => i.id === id);
+            if (!item) return;
+            
+            const title = item.title.toLowerCase();
+            const channel = item.uploader.toLowerCase();
+            
+            const state = localItemStates[id] || { status: "queued" };
+            const itemStatus = state.status || "queued";
+            
+            const matchesText = title.includes(query) || channel.includes(query);
+            
+            let matchesStatus = false;
+            if (status === "all") {
+                matchesStatus = true;
+            } else if (status === "queued" && itemStatus === "queued") {
+                matchesStatus = true;
+            } else if (status === "downloading" && itemStatus === "downloading") {
+                matchesStatus = true;
+            } else if (status === "completed" && itemStatus === "completed") {
+                matchesStatus = true;
+            } else if (status === "skipped" && itemStatus === "skipped") {
+                matchesStatus = true;
+            } else if (status === "error" && itemStatus === "error") {
+                matchesStatus = true;
+            }
+            
+            if (matchesText && matchesStatus) {
                 row.style.display = "";
             } else {
                 row.style.display = "none";
             }
         });
-    });
+    }
 
     // Start download process
     downloadBtn.addEventListener("click", async () => {
@@ -273,9 +410,25 @@ document.addEventListener("DOMContentLoaded", () => {
         const playlistTitleVal = playlistTitle.textContent;
         const playlistUrlVal = urlInput.value.trim();
 
-        // Slide open the non-blocking Queue drawer and shift layout
-        queueDrawer.classList.remove("hidden");
-        document.body.classList.add("queue-open");
+        // Display Active HUD
+        gridHud.classList.remove("hidden");
+        hudJobTitle.textContent = "Queueing download...";
+        
+        // Reset local cached states for selection to queued status
+        selected.forEach(item => {
+            localItemStates[item.id] = {
+                job_num: "--",
+                status: "queued",
+                percentage: 0.0,
+                speed: "--",
+                start_time: "--",
+                end_time: "--",
+                error_detail: ""
+            };
+        });
+        
+        // Force refresh grid states
+        renderPlaylistTable(playlistItems);
 
         try {
             const res = await fetch("/api/download", {
@@ -296,77 +449,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error(data.detail || "Failed to queue download job");
             }
 
-            // Immediately start progress stream and poll queue state
+            const resData = await res.json();
+            hudJobTitle.textContent = `Active Job: #${resData.job_num} - ${playlistTitleVal}`;
+
+            // Immediately start progress stream
             startProgressStream();
-            updateQueueState();
 
         } catch (err) {
             logToTerminal(`[System Error] ${err.message}`, true);
+            hudJobTitle.textContent = `Error: ${err.message}`;
         }
     });
-
-    // Queue Drawer Management
-    toggleQueueBtn.addEventListener("click", () => {
-        queueDrawer.classList.toggle("hidden");
-        document.body.classList.toggle("queue-open", !queueDrawer.classList.contains("hidden"));
-        if (!queueDrawer.classList.contains("hidden")) {
-            updateQueueState();
-        }
-    });
-
-    closeDrawerBtn.addEventListener("click", () => {
-        queueDrawer.classList.add("hidden");
-        document.body.classList.remove("queue-open");
-    });
-
-    async function updateQueueState() {
-        try {
-            const res = await fetch("/api/queue");
-            const data = await res.json();
-            
-            // Render upcoming list
-            pendingQueueList.innerHTML = "";
-            if (!data.pending_jobs || data.pending_jobs.length === 0) {
-                pendingQueueList.innerHTML = `<div class="empty-queue-msg" style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 1rem 0;">No upcoming jobs</div>`;
-            } else {
-                data.pending_jobs.forEach(job => {
-                    const card = document.createElement("div");
-                    card.className = "queued-item-card";
-                    card.innerHTML = `
-                        <div class="q-title" title="${job.title}">${job.title}</div>
-                        <div class="q-count">${job.total_tracks} tracks</div>
-                    `;
-                    pendingQueueList.appendChild(card);
-                });
-            }
-
-            // Badge count
-            let totalJobs = data.pending_jobs.length;
-            if (data.active_job) {
-                totalJobs += 1;
-                // If EventSource is not listening, start it!
-                if (!currentEventSource) {
-                    startProgressStream();
-                }
-            } else {
-                // If no active job but we have no EventSource running,
-                // connect to fetch and display the last completed logs
-                if (!currentEventSource) {
-                    startProgressStream();
-                }
-            }
-
-            if (totalJobs > 0) {
-                queueBadgeCount.textContent = totalJobs;
-                queueBadgeCount.style.display = "inline-block";
-            } else {
-                queueBadgeCount.style.display = "none";
-            }
-
-        } catch (e) {
-            console.error("Failed to fetch queue state:", e);
-        }
-    }
 
     function startProgressStream() {
         if (currentEventSource) {
@@ -378,59 +471,66 @@ document.addEventListener("DOMContentLoaded", () => {
         currentEventSource.onmessage = (event) => {
             const data = JSON.parse(event.data);
             
+            // Show HUD
+            gridHud.classList.remove("hidden");
+            
             if (data.status === "downloading") {
-                // Ensure active view is visible and idle view is hidden
-                activeJobSection.style.display = "block";
-                activeJobIdleMessage.style.display = "none";
-                
-                progressIndex.textContent = `Item ${data.current_index} of ${data.total_files}`;
-                progressTitle.textContent = data.current_title;
-                progressFill.style.width = `${data.percentage}%`;
-                progressPercent.textContent = `${data.percentage}%`;
-                progressSpeed.textContent = data.speed;
-                progressEta.textContent = data.eta;
+                hudJobTitle.textContent = `Active Job: #${data.active_job_num} - ${data.current_title}`;
+                hudSpeed.textContent = data.speed;
+                hudEta.textContent = data.eta;
             } else if (data.status === "completed") {
-                // Ensure logs remain visible
-                activeJobSection.style.display = "block";
-                activeJobIdleMessage.style.display = "none";
-                
-                progressIndex.textContent = "All Done";
-                progressTitle.textContent = "Playlist completed successfully!";
-                progressFill.style.width = "100%";
-                progressPercent.textContent = "100%";
-                progressSpeed.textContent = "--";
-                progressEta.textContent = "--";
+                hudJobTitle.textContent = `Completed Job #${data.active_job_num}`;
+                hudSpeed.textContent = "--";
+                hudEta.textContent = "--";
             } else if (data.status === "failed") {
-                activeJobSection.style.display = "block";
-                activeJobIdleMessage.style.display = "none";
-                
-                progressIndex.textContent = "Failed";
-                progressTitle.textContent = data.error || "Fatal download error occurred";
-                progressFill.style.width = "0%";
-                progressPercent.textContent = "Error";
-                progressSpeed.textContent = "--";
-                progressEta.textContent = "--";
-            } else if (data.status === "idle") {
-                activeJobSection.style.display = "none";
-                activeJobIdleMessage.style.display = "block";
+                hudJobTitle.textContent = `Failed Job #${data.active_job_num}: ${data.error}`;
+                hudSpeed.textContent = "--";
+                hudEta.textContent = "--";
             }
 
-            // Update Total Playlist Progress (downloaded vs pending count and overall progress bar)
-            if (data.total_files > 0) {
-                let completed = data.current_index - 1;
-                if (data.status === "completed") {
-                    completed = data.total_files;
-                }
-                const total = data.total_files;
-                const percent = Math.round((completed / total) * 100);
-                
-                const totalProgressFill = document.getElementById("totalProgressFill");
-                const totalProgressCount = document.getElementById("totalProgressCount");
-                
-                if (totalProgressFill) totalProgressFill.style.width = `${percent}%`;
-                if (totalProgressCount) {
-                    totalProgressCount.textContent = `${completed} / ${total} Completed (Pending: ${total - completed})`;
-                }
+            // Sync item states directly in DOM rows and local cache
+            if (data.item_states) {
+                let completedCount = 0;
+                const totalCount = Object.keys(data.item_states).length;
+
+                Object.keys(data.item_states).forEach(id => {
+                    const itemState = data.item_states[id];
+                    
+                    // Cache state
+                    localItemStates[id] = itemState;
+                    
+                    // Increment overall progress completed count
+                    if (itemState.status === "completed" || itemState.status === "skipped" || itemState.status === "error") {
+                        completedCount++;
+                    }
+
+                    // Dynamically update elements inside table row for real-time responsiveness
+                    const jobCell = document.getElementById(`job-${id}`);
+                    const percentCell = document.getElementById(`percent-val-${id}`);
+                    const fillCell = document.getElementById(`fill-${id}`);
+                    const speedCell = document.getElementById(`speed-${id}`);
+                    const startCell = document.getElementById(`start-${id}`);
+                    const endCell = document.getElementById(`end-${id}`);
+                    const detailCell = document.getElementById(`status-detail-${id}`);
+                    const errorCell = document.getElementById(`error-${id}`);
+
+                    if (jobCell) jobCell.textContent = itemState.job_num !== "--" ? `#${itemState.job_num}` : "--";
+                    if (percentCell) percentCell.textContent = `${itemState.percentage}%`;
+                    if (fillCell) fillCell.style.width = `${itemState.percentage}%`;
+                    if (speedCell) speedCell.textContent = itemState.speed !== "0 KB/s" ? itemState.speed : "--";
+                    if (startCell) startCell.textContent = itemState.start_time;
+                    if (endCell) endCell.textContent = itemState.end_time;
+                    if (detailCell) {
+                        detailCell.textContent = itemState.status;
+                        detailCell.className = `status-detail-cell ${itemState.status}`;
+                    }
+                    if (errorCell) {
+                        errorCell.textContent = itemState.error_detail || "--";
+                        errorCell.title = itemState.error_detail || "";
+                    }
+                });
+
+                hudProgressCount.textContent = `${completedCount} / ${totalCount} Completed (Pending: ${totalCount - completedCount})`;
             }
 
             // Render logs
@@ -444,7 +544,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     } else if (log.startsWith("Finished downloading")) {
                         p.style.color = "var(--success)";
                     } else if (log.startsWith("[Duplicate Skipped]")) {
-                        p.style.color = "#fbbf24"; // Gold color for skipped duplicates
+                        p.style.color = "#fbbf24";
                     }
                     consoleLogs.appendChild(p);
                 });
@@ -455,15 +555,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (data.status === "completed" || data.status === "failed") {
                 currentEventSource.close();
                 currentEventSource = null;
-                // Wait briefly for backend queue worker to fetch next job, then update
-                setTimeout(() => {
-                    updateQueueState();
-                }, 1500);
             }
         };
 
         currentEventSource.onerror = (e) => {
-            console.log("SSE Connection update:", e);
+            console.log("SSE update stream connected");
         };
     }
 
@@ -477,7 +573,7 @@ document.addEventListener("DOMContentLoaded", () => {
         consoleLogs.scrollTop = consoleLogs.scrollHeight;
     }
 
-    // Opening local explorer downloads directory
+    // Opening downloads folder
     async function openLocalDownloadsFolder() {
         try {
             const res = await fetch("/api/open-folder", { method: "POST" });
@@ -491,7 +587,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     openFolderBtn.addEventListener("click", openLocalDownloadsFolder);
-    drawerOpenFolderBtn.addEventListener("click", openLocalDownloadsFolder);
 
     // History Modal actions
     historyBtn.addEventListener("click", openHistoryModal);
@@ -544,9 +639,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 </button>
             ` : '';
             
+            const jobNumDisplay = item.job_num ? `Job #${item.job_num}` : "Job";
+
             card.innerHTML = `
                 <div class="history-info">
-                    <div class="h-title" title="${item.title}">${item.title}</div>
+                    <div class="h-title" title="${item.title}">${jobNumDisplay}: ${item.title}</div>
                     <div class="h-meta">
                         <span class="history-badge badge-${item.format}">${item.format}</span>
                         <span class="history-badge badge-quality">${item.quality}</span>
@@ -584,8 +681,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         });
                         if (res.ok) {
                             historyModal.classList.add("hidden");
-                            queueDrawer.classList.remove("hidden");
-                            updateQueueState();
+                            
+                            // Re-fetch progress stream to update states in the grid
+                            startProgressStream();
                         } else {
                             const err = await res.json();
                             alert(`Failed to resume job: ${err.detail}`);
@@ -629,10 +727,6 @@ document.addEventListener("DOMContentLoaded", () => {
         urlError.classList.add("hidden");
     }
 
-    // Startup Execution: Run shadow fixes, fetch active queue state
+    // Startup shadow configuration checks
     shadowInputFix();
-    updateQueueState();
-
-    // Start periodic background queue updates (badge count and upcoming items sync)
-    queuePollInterval = setInterval(updateQueueState, 3500);
 });
