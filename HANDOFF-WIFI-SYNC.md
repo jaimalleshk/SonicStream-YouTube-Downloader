@@ -79,6 +79,17 @@ remove existing ones without bumping `version`.
 2. Restart SonicStream (allow the one-time Windows Firewall prompt)
 3. In the iPhone app: enter `http://<pc-ip>:8765` + token → pulls manifest, downloads tracks
 
+## Later additions (2026-07-03)
+
+- Manifest tracks now include `size` (bytes, nullable) — the phone skips large
+  files before downloading (user setting, default: skip > 30 MB).
+- Bug fix: `import_playlist` now records `download_dir = folder_path`; before
+  this, folder-imported playlists resolved to `file: null` for every track in
+  the sync manifest (found while building the phone-side sync).
+- A small "Sync Test" playlist (4 generated tones from
+  `C:\Users\jaima\Music\MusicAppTest`) exists in history — it's the standing
+  sample for end-to-end sync tests; please leave it in place.
+
 ## Suggested follow-ups for you (not done, by design)
 
 - Settings UI section: Wi-Fi Sync toggle, show IP/port/token, QR code for pairing
