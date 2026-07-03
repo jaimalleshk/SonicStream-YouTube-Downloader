@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const historyModal = document.getElementById("historyModal");
     const closeHistoryModalBtn = document.getElementById("closeHistoryModalBtn");
     const clearHistoryBtn = document.getElementById("clearHistoryBtn");
-    const historyList = document.getElementById("historyList");
+    const historyTableBody = document.getElementById("historyTableBody");
 
     // Pagination elements
     const btnFirstPage = document.getElementById("btnFirstPage");
@@ -759,95 +759,95 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function loadHistoryItems() {
-        historyList.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Loading logs...</div>`;
+        historyTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Loading logs...</td></tr>`;
         try {
             const res = await fetch("/api/history");
             const data = await res.json();
             renderHistory(data);
         } catch (e) {
-            historyList.innerHTML = `<div style="text-align: center; color: var(--error); padding: 1.5rem;">Failed to load history: ${e.message}</div>`;
+            historyTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--error); padding: 1.5rem;">Failed to load history: ${e.message}</td></tr>`;
         }
     }
 
     function renderHistory(items) {
-        historyList.innerHTML = "";
+        historyTableBody.innerHTML = "";
         if (!items || items.length === 0) {
-            historyList.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 2rem 0;">No download logs found.</div>`;
+            historyTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem 0;">No download logs found.</td></tr>`;
             return;
         }
 
         items.forEach(item => {
-            const card = document.createElement("div");
-            card.className = "history-card";
-            
+            const row = document.createElement("tr");
             const dateStr = new Date(item.timestamp).toLocaleString();
-            const showResume = item.completed_tracks < item.total_tracks;
-            const resumeBtnHtml = showResume ? `
-                <button class="btn btn-primary btn-sm resume-history-btn" data-id="${item.id}" style="background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple)); border: none;">
-                    Resume
-                </button>
-            ` : '';
             
-            const jobNumDisplay = item.job_num ? `Job #${item.job_num}` : "Job";
+            const isPlaylist = item.is_playlist || item.total_tracks > 1;
+            const typeLabel = isPlaylist ? "Playlist" : "Single File";
+            const typeClass = isPlaylist ? "badge-video" : "badge-quality";
+            
+            const successCount = item.success_count || 0;
+            const failureCount = item.failure_count || 0;
+            
+            const jobNumDisplay = item.job_num ? `#${item.job_num}` : "--";
 
-            card.innerHTML = `
-                <div class="history-info">
-                    <div class="h-title" title="${item.title}">${jobNumDisplay}: ${item.title}</div>
-                    <div class="h-meta">
-                        <span class="history-badge badge-${item.format}">${item.format}</span>
-                        <span class="history-badge badge-quality">${item.quality}</span>
-                        <span class="h-time">${dateStr}</span>
-                    </div>
-                </div>
-                <div class="history-status-container" style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
-                    <span class="history-progress-text">${item.completed_tracks} / ${item.total_tracks} tracks</span>
+            row.innerHTML = `
+                <td class="job-cell">${jobNumDisplay}</td>
+                <td><span class="history-badge ${typeClass}">${typeLabel}</span></td>
+                <td style="font-weight: 600; color: var(--text-primary);" title="${item.title}">${item.title}</td>
+                <td class="duration-cell" style="text-align: center;">${item.total_tracks}</td>
+                <td class="time-cell">${dateStr}</td>
+                <td style="color: #27c93f; font-weight: 700; font-family: var(--font-mono); text-align: center;">${successCount}</td>
+                <td style="color: var(--error); font-weight: 700; font-family: var(--font-mono); text-align: center;">${failureCount}</td>
+                <td>
                     <div style="display: flex; gap: 0.4rem;">
-                        ${resumeBtnHtml}
-                        <button class="btn btn-secondary btn-sm re-analyze-history-btn" data-url="${item.url}">
-                            Re-analyze
+                        <button class="btn btn-secondary btn-sm load-grid-btn" data-url="${item.url}" style="padding: 0.35rem 0.6rem; font-size: 0.75rem;">
+                            Load Grid
+                        </button>
+                        <button class="btn btn-primary btn-sm redownload-btn" data-id="${item.id}" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple)); border: none;">
+                            Delta D/L
                         </button>
                     </div>
-                </div>
+                </td>
             `;
-            
-            card.querySelector(".re-analyze-history-btn").addEventListener("click", (e) => {
+
+            row.querySelector(".load-grid-btn").addEventListener("click", (e) => {
                 const url = e.target.getAttribute("data-url");
                 urlInput.value = url;
                 historyModal.classList.add("hidden");
                 analyzeLink();
             });
 
-            if (showResume) {
-                card.querySelector(".resume-history-btn").addEventListener("click", async (e) => {
-                    const jobId = e.target.getAttribute("data-id");
-                    e.target.disabled = true;
-                    e.target.textContent = "Queueing...";
-                    try {
-                        const res = await fetch("/api/history/resume", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ job_id: jobId })
-                        });
-                        if (res.ok) {
-                            historyModal.classList.add("hidden");
-                            
-                            // Re-fetch progress stream to update states in the grid
-                            startProgressStream();
-                        } else {
-                            const err = await res.json();
-                            alert(`Failed to resume job: ${err.detail}`);
-                            e.target.disabled = false;
-                            e.target.textContent = "Resume";
-                        }
-                    } catch (err) {
-                        alert(`Error: ${err.message}`);
+            row.querySelector(".redownload-btn").addEventListener("click", async (e) => {
+                const jobId = e.target.getAttribute("data-id");
+                e.target.disabled = true;
+                e.target.textContent = "Queueing...";
+                try {
+                    const res = await fetch("/api/history/resume", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ job_id: jobId })
+                    });
+                    if (res.ok) {
+                        historyModal.classList.add("hidden");
+                        
+                        // Clear grid status caches and redraw
+                        localItemStates = {};
+                        renderPlaylistTable(playlistItems);
+
+                        startProgressStream();
+                    } else {
+                        const err = await res.json();
+                        alert(`Failed to resume job: ${err.detail}`);
                         e.target.disabled = false;
-                        e.target.textContent = "Resume";
+                        e.target.textContent = "Delta D/L";
                     }
-                });
-            }
-            
-            historyList.appendChild(card);
+                } catch (err) {
+                    alert(`Error: ${err.message}`);
+                    e.target.disabled = false;
+                    e.target.textContent = "Delta D/L";
+                }
+            });
+
+            historyTableBody.appendChild(row);
         });
     }
 
@@ -869,7 +869,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const activeCard = initialQuality.closest(".quality-card");
             if (activeCard) activeCard.classList.add("active");
         }
-        // Initialize dynamic format/quality indicators on HUD
         updateActiveQualityLabel();
     }
 

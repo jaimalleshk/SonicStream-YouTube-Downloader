@@ -115,12 +115,14 @@ def save_history(history):
     except Exception:
         pass
 
-def update_history_item(job_id: str, completed_count: int):
+def update_history_counts(job_id: str, success: int, failures: int):
     with history_lock:
         history = load_history()
         for item in history:
             if item.get("id") == job_id:
-                item["completed_tracks"] = completed_count
+                item["success_count"] = success
+                item["failure_count"] = failures
+                item["completed_tracks"] = success + failures
                 break
         save_history(history)
 
@@ -250,7 +252,8 @@ def run_download_job(job_data: dict):
             "active_job_num": job_num
         })
 
-    completed_count = 0
+    success_count = 0
+    failure_count = 0
 
     for idx, item in enumerate(request.items):
         with progress_lock:
@@ -303,8 +306,8 @@ def run_download_job(job_data: dict):
                         "percentage": 100.0,
                         "end_time": datetime.now().strftime("%H:%M:%S")
                     })
-            completed_count += 1
-            update_history_item(job_id, completed_count)
+            success_count += 1
+            update_history_counts(job_id, success_count, failure_count)
             continue
 
         # Quality and format resolution
@@ -390,8 +393,8 @@ def run_download_job(job_data: dict):
                         "percentage": 100.0,
                         "end_time": datetime.now().strftime("%H:%M:%S")
                     })
-            completed_count += 1
-            update_history_item(job_id, completed_count)
+            success_count += 1
+            update_history_counts(job_id, success_count, failure_count)
         else:
             error_str = f"Error downloading {item.title} after {max_retries} attempts: {error_msg}"
             with progress_lock:
@@ -402,8 +405,8 @@ def run_download_job(job_data: dict):
                         "end_time": datetime.now().strftime("%H:%M:%S"),
                         "error_detail": error_msg
                     })
-            completed_count += 1
-            update_history_item(job_id, completed_count)
+            failure_count += 1
+            update_history_counts(job_id, success_count, failure_count)
 
     with progress_lock:
         download_state["status"] = "completed"
@@ -457,6 +460,9 @@ async def start_download(req: DownloadRequest):
             "timestamp": timestamp,
             "total_tracks": len(req.items),
             "completed_tracks": 0,
+            "success_count": 0,
+            "failure_count": 0,
+            "is_playlist": len(req.items) > 1 or req.playlist_url is not None,
             "format": req.format,
             "quality": req.quality
         }
@@ -630,6 +636,9 @@ async def resume_job(req: ResumeRequest):
                 "timestamp": datetime.now().isoformat(),
                 "total_tracks": len(entries),
                 "completed_tracks": 0,
+                "success_count": 0,
+                "failure_count": 0,
+                "is_playlist": job.get("is_playlist", len(entries) > 1),
                 "format": job.get("format", "audio"),
                 "quality": job.get("quality", "highest")
             }
