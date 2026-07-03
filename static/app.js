@@ -163,6 +163,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
             if (data.download_dir) {
                 downloadDirInput.value = data.download_dir;
+                syncSavingToLabel();
             }
         } catch (e) {
             console.error("Error loading default directory:", e);
@@ -180,6 +181,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
             if (data.download_dir) {
                 downloadDirInput.value = data.download_dir;
+                syncSavingToLabel();
             }
         } catch (e) {
             alert(`Failed to select folder: ${e.message}`);
@@ -188,6 +190,18 @@ document.addEventListener("DOMContentLoaded", () => {
             browseDirBtn.textContent = oldText;
         }
     });
+
+    // Manual typing directory listener
+    downloadDirInput.addEventListener("input", syncSavingToLabel);
+
+    function syncSavingToLabel() {
+        const path = downloadDirInput.value.trim() || "--";
+        const lbl = document.getElementById("lblSavingTo");
+        if (lbl) {
+            lbl.textContent = `Saving to: ${path}`;
+            lbl.title = path; // Tooltip shows full path
+        }
+    }
 
     // Analyze link
     analyzeBtn.addEventListener("click", analyzeLink);
@@ -1048,6 +1062,7 @@ document.addEventListener("DOMContentLoaded", () => {
         updateActiveQualityLabel();
     }
 
+    // Main HUD initialization syncs
     function hideError() {
         urlError.textContent = "";
         urlError.classList.add("hidden");

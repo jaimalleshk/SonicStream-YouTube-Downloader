@@ -1,5 +1,20 @@
 [
   {
+    "id": "job_1783040581",
+    "job_num": 3,
+    "title": "All Songs",
+    "url": "https://www.youtube.com/watch?v=efv3iHUarxY&list=PLcqF0SS4XiHFvtqCcHdDHrKGw_r9aRCak",
+    "timestamp": "2026-07-02T20:03:01.870652",
+    "total_tracks": 64,
+    "completed_tracks": 22,
+    "success_count": 22,
+    "failure_count": 0,
+    "is_playlist": true,
+    "format": "audio",
+    "quality": "highest",
+    "download_dir": "D:\\OneDrive - Triamber\\YoutubeDownloads"
+  },
+  {
     "id": "job_1783039591",
     "job_num": 2,
     "title": "All Songs",

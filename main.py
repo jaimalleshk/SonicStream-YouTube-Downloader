@@ -278,8 +278,32 @@ def run_download_job(job_data: dict):
                 downloaded = d.get('downloaded_bytes', 0)
                 percent = round((downloaded / total) * 100, 1)
                 
-                speed = d.get('_speed_str', '0 KB/s')
-                eta = d.get('_eta_str', '00:00')
+                # Robust speed extraction and fallback
+                speed = d.get('_speed_str')
+                if not speed:
+                    speed_bytes = d.get('speed')
+                    if speed_bytes is not None:
+                        if speed_bytes > 1024 * 1024:
+                            speed = f"{speed_bytes / (1024 * 1024):.1f} MB/s"
+                        elif speed_bytes > 1024:
+                            speed = f"{speed_bytes / 1024:.1f} KB/s"
+                        else:
+                            speed = f"{speed_bytes} B/s"
+                    else:
+                        speed = '0 KB/s'
+                speed = speed.strip()
+
+                # Robust ETA extraction and fallback
+                eta = d.get('_eta_str')
+                if not eta:
+                    eta_val = d.get('eta')
+                    if eta_val is not None:
+                        mins = int(eta_val // 60)
+                        secs = int(eta_val % 60)
+                        eta = f"{mins:02d}:{secs:02d}"
+                    else:
+                        eta = '00:00'
+                eta = eta.strip()
                 
                 with progress_lock:
                     download_state["percentage"] = percent
