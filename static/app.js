@@ -5,9 +5,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const analyzeSpinner = document.getElementById("analyzeSpinner");
     const urlError = document.getElementById("urlError");
     
-    const formatLabels = document.querySelectorAll(".toggle-option");
-    const qualityCards = document.querySelectorAll(".quality-card");
-    
     const playlistSection = document.getElementById("playlistSection");
     const playlistTitle = document.getElementById("playlistTitle");
     const playlistMeta = document.getElementById("playlistMeta");
@@ -76,56 +73,39 @@ document.addEventListener("DOMContentLoaded", () => {
         return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
 
-    // Format Toggle change listeners
+    // Format Pill change listeners
     const formatRadios = document.querySelectorAll('input[name="format"]');
     formatRadios.forEach(radio => {
         radio.addEventListener("change", (e) => {
-            formatLabels.forEach(l => l.classList.remove("active"));
-            const activeLabel = e.target.closest(".toggle-option");
-            if (activeLabel) activeLabel.classList.add("active");
-            toggleQualityLabels(e.target.value);
+            document.querySelectorAll('input[name="format"]').forEach(r => {
+                r.closest(".header-pill-btn")?.classList.remove("active");
+            });
+            if (e.target.checked) {
+                e.target.closest(".header-pill-btn")?.classList.add("active");
+            }
             updateActiveQualityLabel();
         });
     });
 
-    formatLabels.forEach(label => {
-        label.addEventListener("click", (e) => {
-            const radio = label.querySelector('input[type="radio"]');
-            if (radio && e.target !== radio) {
-                radio.checked = true;
-                radio.dispatchEvent(new Event("change"));
-            }
-        });
-    });
-
-    function toggleQualityLabels(format) {
-        const audioDetails = document.querySelectorAll(".q-detail");
-        const videoDetails = document.querySelectorAll(".q-detail-vid");
-        
-        if (format === "audio") {
-            audioDetails.forEach(el => el.classList.remove("hidden"));
-            videoDetails.forEach(el => el.classList.add("hidden"));
-        } else {
-            audioDetails.forEach(el => el.classList.add("hidden"));
-            videoDetails.forEach(el => el.classList.remove("hidden"));
-        }
-    }
-
-    // Quality Cards selection
+    // Quality Pill change listeners
     const qualityRadios = document.querySelectorAll('input[name="quality"]');
     qualityRadios.forEach(radio => {
         radio.addEventListener("change", (e) => {
-            qualityCards.forEach(c => c.classList.remove("active"));
-            const activeCard = e.target.closest(".quality-card");
-            if (activeCard) activeCard.classList.add("active");
+            document.querySelectorAll('input[name="quality"]').forEach(r => {
+                r.closest(".header-pill-btn")?.classList.remove("active");
+            });
+            if (e.target.checked) {
+                e.target.closest(".header-pill-btn")?.classList.add("active");
+            }
             updateActiveQualityLabel();
         });
     });
 
-    qualityCards.forEach(card => {
-        card.addEventListener("click", (e) => {
-            const radio = card.querySelector('input[type="radio"]');
-            if (radio && e.target !== radio) {
+    // Ensure label click toggles radio
+    document.querySelectorAll(".header-pill-btn").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            const radio = btn.querySelector('input[type="radio"]');
+            if (radio && e.target !== radio && !radio.checked) {
                 radio.checked = true;
                 radio.dispatchEvent(new Event("change"));
             }
@@ -568,8 +548,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function getSelectedItems() {
         const checkedCheckboxes = document.querySelectorAll(".video-checkbox:checked");
-        const selectedIds = Array.from(checkedCheckboxes).map(cb => cb.getAttribute("data-id"));
-        return playlistItems.filter(item => selectedIds.includes(item.id));
+        const selectedIds = Array.from(checkedCheckboxes).map(cb => dataId => cb.getAttribute("data-id"));
+        const actualIds = Array.from(checkedCheckboxes).map(cb => cb.getAttribute("data-id"));
+        return playlistItems.filter(item => actualIds.includes(item.id));
     }
 
     // Interactive Sorting
@@ -793,7 +774,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     const startCell = document.getElementById(`start-${id}`);
                     const endCell = document.getElementById(`end-${id}`);
                     const detailCell = document.getElementById(`status-detail-${id}`);
-                    const errorCell = document.getElementById(`error-${id}`);
+                    const errorCell = document.getElementById('error-' + id);
 
                     if (jobCell) jobCell.textContent = itemState.job_num !== "--" ? `#${itemState.job_num}` : "--";
                     if (percentCell) percentCell.textContent = `${itemState.percentage}%`;
@@ -1041,31 +1022,16 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Helpers for error reporting
-    function showError(msg) {
-        urlError.textContent = msg;
-        urlError.classList.remove("hidden");
-    }
-
     function shadowInputFix() {
         const initialFormat = document.querySelector('input[name="format"]:checked');
         if (initialFormat) {
-            const activeLabel = initialFormat.closest(".toggle-option");
-            if (activeLabel) activeLabel.classList.add("active");
-            toggleQualityLabels(initialFormat.value);
+            initialFormat.closest(".header-pill-btn")?.classList.add("active");
         }
         const initialQuality = document.querySelector('input[name="quality"]:checked');
         if (initialQuality) {
-            const activeCard = initialQuality.closest(".quality-card");
-            if (activeCard) activeCard.classList.add("active");
+            initialQuality.closest(".header-pill-btn")?.classList.add("active");
         }
         updateActiveQualityLabel();
-    }
-
-    // Main HUD initialization syncs
-    function hideError() {
-        urlError.textContent = "";
-        urlError.classList.add("hidden");
     }
 
     // Startup shadow configuration checks

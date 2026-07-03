@@ -32,6 +32,42 @@
                 <span class="logo-text">SonicStream</span>
                 <span class="logo-badge">MVP</span>
             </div>
+
+            <!-- Inline Format & Quality Selectors in Header -->
+            <div class="header-config-group" style="display: flex; align-items: center; gap: 0.65rem;">
+                <!-- Format Pill Group -->
+                <div class="header-pill-group" style="display: flex; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px;">
+                    <label class="header-pill-btn active" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; color: var(--text-secondary); transition: var(--transition);">
+                        <input type="radio" name="format" value="audio" checked style="display: none;">
+                        Audio
+                    </label>
+                    <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; color: var(--text-secondary); transition: var(--transition);">
+                        <input type="radio" name="format" value="video" style="display: none;">
+                        Video
+                    </label>
+                </div>
+
+                <!-- Quality Pill Group -->
+                <div class="header-pill-group" style="display: flex; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px;">
+                    <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
+                        <input type="radio" name="quality" value="low" style="display: none;">
+                        Low
+                    </label>
+                    <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
+                        <input type="radio" name="quality" value="medium" style="display: none;">
+                        Med
+                    </label>
+                    <label class="header-pill-btn active" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
+                        <input type="radio" name="quality" value="high" checked style="display: none;">
+                        High
+                    </label>
+                    <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
+                        <input type="radio" name="quality" value="highest" style="display: none;">
+                        Max
+                    </label>
+                </div>
+            </div>
+
             <div class="header-actions" style="display: flex; align-items: center; gap: 0.75rem;">
                 <!-- Download Directory Inline Selector -->
                 <div class="header-directory-selector" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); padding: 0.35rem 0.75rem; border-radius: 8px;">
@@ -79,69 +115,6 @@
                     </button>
                 </div>
                 <div id="urlError" class="error-msg hidden"></div>
-            </section>
-
-            <!-- Configuration Section -->
-            <section class="config-grid">
-                <!-- Format Panel -->
-                <div class="card config-card">
-                    <h2>Select Format</h2>
-                    <div class="format-toggle">
-                        <label class="toggle-option active" data-value="audio">
-                            <input type="radio" name="format" value="audio" checked>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M9 18V5l12-2v13"></path>
-                                <circle cx="6" cy="18" r="3"></circle>
-                                <circle cx="18" cy="16" r="3"></circle>
-                            </svg>
-                            Audio (.mp3)
-                        </label>
-                        <label class="toggle-option" data-value="video">
-                            <input type="radio" name="format" value="video">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
-                                <line x1="7" y1="2" x2="7" y2="22"></line>
-                                <line x1="17" y1="2" x2="17" y2="22"></line>
-                                <line x1="2" y1="12" x2="22" y2="12"></line>
-                                <line x1="2" y1="7" x2="7" y2="7"></line>
-                                <line x1="2" y1="17" x2="7" y2="17"></line>
-                                <line x1="17" y1="17" x2="22" y2="17"></line>
-                                <line x1="17" y1="7" x2="22" y2="7"></line>
-                            </svg>
-                            Video (.mp4)
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Quality Panel -->
-                <div class="card config-card">
-                    <h2>Select Quality</h2>
-                    <div class="quality-selector" id="qualitySelector">
-                        <label class="quality-card" data-quality="low">
-                            <input type="radio" name="quality" value="low">
-                            <span class="q-title">Low</span>
-                            <span class="q-detail" id="qAudioLow">64 kbps</span>
-                            <span class="q-detail-vid hidden" id="qVideoLow">360p / Worst</span>
-                        </label>
-                        <label class="quality-card" data-quality="medium">
-                            <input type="radio" name="quality" value="medium">
-                            <span class="q-title">Medium</span>
-                            <span class="q-detail" id="qAudioMedium">128 kbps</span>
-                            <span class="q-detail-vid hidden" id="qVideoMedium">480p / SD</span>
-                        </label>
-                        <label class="quality-card active" data-quality="high">
-                            <input type="radio" name="quality" value="high" checked>
-                            <span class="q-title">High</span>
-                            <span class="q-detail" id="qAudioHigh">192 kbps</span>
-                            <span class="q-detail-vid hidden" id="qVideoHigh">720p / HD</span>
-                        </label>
-                        <label class="quality-card" data-quality="highest">
-                            <input type="radio" name="quality" value="highest">
-                            <span class="q-title">Highest</span>
-                            <span class="q-detail" id="qAudioHighest">320 kbps</span>
-                            <span class="q-detail-vid hidden" id="qVideoHighest">1080p / Best</span>
-                        </label>
-                </div>
             </section>
 
             <!-- Playlist/Video Items List -->
