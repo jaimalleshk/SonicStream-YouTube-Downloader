@@ -862,3 +862,59 @@ input[type="checkbox"]:checked::before {
     border: 1px solid var(--border-color);
 }
 
+/* Sliding Queue Drawer Styles */
+.queue-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 400px;
+    height: 100vh;
+    background: rgba(11, 15, 25, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-left: 1px solid var(--border-color);
+    z-index: 95;
+    box-shadow: -10px 0 40px rgba(0, 0, 0, 0.6);
+    transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+    display: flex;
+    flex-direction: column;
+}
+
+.queue-drawer.hidden {
+    transform: translateX(100%);
+    display: flex !important; /* Keep display flex to allow sliding animations */
+    pointer-events: none; /* Block clicks when slides away */
+}
+
+.queued-item-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.queued-item-card .q-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-grow: 1;
+}
+
+.queued-item-card .q-count {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.05);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+}
+
+

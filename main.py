@@ -3,6 +3,7 @@ import sys
 import json
 import time
 import socket
+import queue
 import asyncio
 import subprocess
 import threading
@@ -33,7 +34,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 # Global state for downloading progress
 progress_lock = threading.Lock()
 download_state = {
-    "status": "idle",       # idle, fetching, downloading, completed, failed
+    "status": "idle",       # idle, downloading, completed, failed
     "current_index": 0,
     "total_files": 0,
     "current_title": "",
@@ -42,6 +43,14 @@ download_state = {
     "eta": "00:00",
     "logs": [],
     "error_message": ""
+}
+
+# Queue Management
+download_queue = queue.Queue()
+queue_lock = threading.Lock()
+queue_state = {
+    "active_job": None,       # current active job details
+    "pending_jobs": []        # list of queued jobs
 }
 
 class FetchRequest(BaseModel):
@@ -58,6 +67,13 @@ class DownloadRequest(BaseModel):
     quality: str  # "low", "medium", "high", "highest"
     playlist_title: Optional[str] = None
     playlist_url: Optional[str] = None
+    skip_duplicates: Optional[bool] = True
+
+# Helper: Sanitize windows filenames
+def sanitize_filename(filename: str) -> str:
+    for char in ['\\', '/', ':', '*', '?', '"', '<', '>', '|']:
+        filename = filename.replace(char, '_')
+    return filename
 
 # History Helpers
 def load_history():
@@ -150,9 +166,24 @@ async def fetch_info(req: FetchRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def run_download_sync(request: DownloadRequest, job_id: str):
-    global download_state
+def run_download_job(job_data: dict):
+    global download_state, queue_state
     
+    job_id = job_data["job_id"]
+    request = job_data["request"]
+    
+    # Set active job in queue state
+    with queue_lock:
+        queue_state["active_job"] = {
+            "id": job_id,
+            "title": job_data["title"],
+            "total_tracks": len(request.items),
+            "format": request.format,
+            "quality": request.quality
+        }
+        # Remove from pending list
+        queue_state["pending_jobs"] = [j for j in queue_state["pending_jobs"] if j["id"] != job_id]
+
     with progress_lock:
         download_state.update({
             "status": "downloading",
@@ -162,7 +193,7 @@ def run_download_sync(request: DownloadRequest, job_id: str):
             "percentage": 0.0,
             "speed": "0 KB/s",
             "eta": "00:00",
-            "logs": ["Starting downloads..."],
+            "logs": [f"Starting job: {job_data['title']}"],
             "error_message": ""
         })
 
@@ -196,6 +227,20 @@ def run_download_sync(request: DownloadRequest, job_id: str):
             download_state["percentage"] = 0.0
             download_state["logs"].append(f"[{idx+1}/{len(request.items)}] Preparing: {item.title}")
 
+        # Check for local duplicates first
+        sanitized_title = sanitize_filename(item.title)
+        ext = "mp3" if request.format == "audio" else "mp4"
+        expected_path = os.path.join(DOWNLOAD_DIR, f"{sanitized_title}.{ext}")
+        
+        if request.skip_duplicates and os.path.exists(expected_path):
+            skip_msg = f"[Duplicate Skipped] \"{sanitized_title}.{ext}\" already exists at: {expected_path}"
+            with progress_lock:
+                download_state["percentage"] = 100.0
+                download_state["logs"].append(skip_msg)
+            completed_count += 1
+            update_history_item(job_id, completed_count)
+            continue
+
         # Quality and format resolution
         ydl_opts = {
             'quiet': True,
@@ -205,11 +250,12 @@ def run_download_sync(request: DownloadRequest, job_id: str):
             'download_archive': os.path.join(DOWNLOAD_DIR, 'download_archive.txt'),
             'nooverwrites': True,
             'noplaylist': True,
+            # Embed metadata and album artwork options
+            'writethumbnail': True,
         }
 
         if request.format == "audio":
             ydl_opts['format'] = 'bestaudio/best'
-            # Map quality string to kbps
             quality_map = {
                 "low": "64",
                 "medium": "128",
@@ -217,13 +263,21 @@ def run_download_sync(request: DownloadRequest, job_id: str):
                 "highest": "320"
             }
             kbps = quality_map.get(request.quality, "192")
-            ydl_opts['postprocessors'] = [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': kbps,
-            }]
+            ydl_opts['postprocessors'] = [
+                {
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': kbps,
+                },
+                {
+                    'key': 'EmbedThumbnail',
+                },
+                {
+                    'key': 'FFmpegMetadata',
+                    'add_metadata': True,
+                }
+            ]
         else:
-            # Video qualities
             if request.quality == "low":
                 ydl_opts['format'] = 'worstvideo[ext=mp4]+worstaudio/worst'
             elif request.quality == "medium":
@@ -233,8 +287,16 @@ def run_download_sync(request: DownloadRequest, job_id: str):
             else: # highest
                 ydl_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best'
             
-            # Ensure mp4 container merging
             ydl_opts['merge_output_format'] = 'mp4'
+            ydl_opts['postprocessors'] = [
+                {
+                    'key': 'EmbedThumbnail',
+                },
+                {
+                    'key': 'FFmpegMetadata',
+                    'add_metadata': True,
+                }
+            ]
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -245,7 +307,6 @@ def run_download_sync(request: DownloadRequest, job_id: str):
             error_str = f"Error downloading {item.title}: {str(e)}"
             with progress_lock:
                 download_state["logs"].append(error_str)
-            # Even on failure, count it as processed in queue to increment progress
             completed_count += 1
             update_history_item(job_id, completed_count)
             continue
@@ -254,12 +315,25 @@ def run_download_sync(request: DownloadRequest, job_id: str):
         download_state["status"] = "completed"
         download_state["logs"].append("All downloads finished!")
 
+    with queue_lock:
+        queue_state["active_job"] = None
+
+def worker_loop():
+    while True:
+        job = download_queue.get()
+        try:
+            run_download_job(job)
+        except Exception as e:
+            print(f"Error in queue worker: {e}")
+        finally:
+            download_queue.task_done()
+
+# Start background queue thread immediately
+worker_thread = threading.Thread(target=worker_loop, daemon=True)
+worker_thread.start()
+
 @app.post("/api/download")
-async def start_download(req: DownloadRequest, background_tasks: BackgroundTasks):
-    global download_state
-    if download_state["status"] == "downloading":
-        raise HTTPException(status_code=400, detail="A download is already in progress")
-    
+async def start_download(req: DownloadRequest):
     # Create history entry
     job_id = f"job_{int(time.time())}"
     timestamp = datetime.now().isoformat()
@@ -280,11 +354,37 @@ async def start_download(req: DownloadRequest, background_tasks: BackgroundTasks
     
     with history_lock:
         history = load_history()
-        history.insert(0, new_entry) # Put newest first
+        history.insert(0, new_entry)
         save_history(history)
+
+    # Push to task queue
+    job_data = {
+        "job_id": job_id,
+        "title": title,
+        "request": req
+    }
+    
+    with queue_lock:
+        queue_state["pending_jobs"].append(job_data)
         
-    background_tasks.add_task(run_download_sync, req, job_id)
-    return {"message": "Download started", "job_id": job_id}
+    download_queue.put(job_data)
+    return {"message": "Job queued successfully", "job_id": job_id}
+
+@app.get("/api/queue")
+async def get_queue():
+    with queue_lock:
+        return {
+            "active_job": queue_state["active_job"],
+            "pending_jobs": [
+                {
+                    "id": j["job_id"],
+                    "title": j["title"],
+                    "total_tracks": len(j["request"].items),
+                    "format": j["request"].format,
+                    "quality": j["request"].quality
+                } for j in queue_state["pending_jobs"]
+            ]
+        }
 
 @app.get("/api/progress")
 async def get_progress_stream():
@@ -317,6 +417,8 @@ async def get_progress_stream():
             yield f"data: {json.dumps(payload)}\n\n"
             
             if status in ["completed", "failed", "idle"] and last_status == status:
+                # Instead of shutting down the stream permanently, we break when the current active job finishes.
+                # The client will reconnect when a new active job starts.
                 break
                 
             last_status = status

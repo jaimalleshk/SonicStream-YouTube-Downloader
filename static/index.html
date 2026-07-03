@@ -35,6 +35,17 @@
                     </svg>
                     History
                 </button>
+                <button class="btn btn-secondary open-folder-btn" id="toggleQueueBtn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="8" y1="6" x2="21" y2="6"/>
+                        <line x1="8" y1="12" x2="21" y2="12"/>
+                        <line x1="8" y1="18" x2="21" y2="18"/>
+                        <line x1="3" y1="6" x2="3.01" y2="6"/>
+                        <line x1="3" y1="12" x2="3.01" y2="12"/>
+                        <line x1="3" y1="18" x2="3.01" y2="18"/>
+                    </svg>
+                    Queue <span class="queue-badge" id="queueBadgeCount" style="margin-left: 0.4rem; padding: 0.1rem 0.4rem; background: var(--neon-blue); border-radius: 999px; font-size: 0.75rem; font-weight: 700; color: white; display: none;">0</span>
+                </button>
                 <button class="btn btn-secondary open-folder-btn" id="openFolderBtn">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -129,6 +140,13 @@
                         </label>
                     </div>
                 </div>
+                <!-- Duplicate check option -->
+                <div style="grid-column: 1 / -1; display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); padding: 0.85rem 1.25rem; border-radius: 12px; backdrop-filter: blur(12px);">
+                    <input type="checkbox" id="skipDuplicatesCheckbox" checked style="cursor: pointer; width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0; appearance: auto; -webkit-appearance: auto;">
+                    <label for="skipDuplicatesCheckbox" style="font-size: 0.95rem; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none;">
+                        Skip duplicates (if files already exist in your local downloads folder)
+                    </label>
+                </div>
             </section>
 
             <!-- Playlist/Video Items List -->
@@ -169,75 +187,108 @@
         </main>
     </div>
 
-    <!-- Live Progress Overlay Modal -->
-    <div class="modal-overlay hidden" id="progressModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Downloading Media</h3>
-                <span class="status-badge pulse" id="downloadBadge">Downloading</span>
+    <!-- Sliding Queue Drawer Panel -->
+    <div class="queue-drawer hidden" id="queueDrawer">
+        <div class="drawer-header" style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(15, 23, 42, 0.4);">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--neon-blue)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="logo-icon pulse">
+                    <line x1="8" y1="6" x2="21" y2="6"/>
+                    <line x1="8" y1="12" x2="21" y2="12"/>
+                    <line x1="8" y1="18" x2="21" y2="18"/>
+                    <line x1="3" y1="6" x2="3.01" y2="6"/>
+                    <line x1="3" y1="12" x2="3.01" y2="12"/>
+                    <line x1="3" y1="18" x2="3.01" y2="18"/>
+                </svg>
+                <h3 style="font-size: 1.2rem; font-weight: 700;">Active Queue</h3>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="closeDrawerBtn" style="padding: 0.4rem; border-radius: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="drawer-body" style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; overflow-y: auto; height: calc(100% - 145px);">
+            <!-- Active Job Details -->
+            <div class="active-job-section" id="activeJobSection">
+                <div class="progress-details" style="background: rgba(255, 255, 255, 0.01); border: 1px solid var(--border-color); padding: 1.25rem; border-radius: 16px;">
+                    <div class="progress-info" style="display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 1rem;">
+                        <span class="item-index" id="progressIndex" style="font-size: 0.8rem; font-weight: 700; color: var(--neon-blue); text-transform: uppercase;">Item 0 of 0</span>
+                        <div class="item-title" id="progressTitle" style="font-size: 1rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">No Active Item</div>
+                    </div>
+                    
+                    <div class="progress-track" style="height: 6px; background: rgba(255,255,255,0.05); margin-bottom: 0.75rem; border-radius: 999px; overflow: hidden;">
+                        <div class="progress-fill" id="progressFill" style="width: 0%; height: 100%;"></div>
+                    </div>
+                    
+                    <div class="progress-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); background: rgba(0, 0, 0, 0.2); padding: 0.75rem; border-radius: 10px; border: 1px solid var(--border-color); margin-bottom: 1rem; text-align: center;">
+                        <div class="stat-item" style="border-right: 1px solid var(--border-color); display: flex; flex-direction: column;">
+                            <span class="label" style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.15rem;">Progress</span>
+                            <span class="value" id="progressPercent" style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary);">0%</span>
+                        </div>
+                        <div class="stat-item" style="border-right: 1px solid var(--border-color); display: flex; flex-direction: column;">
+                            <span class="label" style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.15rem;">Speed</span>
+                            <span class="value" id="progressSpeed" style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary);">0 KB/s</span>
+                        </div>
+                        <div class="stat-item" style="display: flex; flex-direction: column;">
+                            <span class="label" style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.15rem;">ETA</span>
+                            <span class="value" id="progressEta" style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary);">00:00</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Overall Playlist Progress -->
+                    <div class="playlist-progress-section" style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                        <div class="progress-info" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span class="item-index" style="color: var(--neon-purple); font-size: 0.75rem; font-weight: 700; text-transform: uppercase;">Total Playlist</span>
+                            <span id="totalProgressCount" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">0 / 0 Completed</span>
+                        </div>
+                        <div class="progress-track" style="height: 8px; background: rgba(255, 255, 255, 0.05); border-radius: 9999px; overflow: hidden;">
+                            <div class="progress-fill" id="totalProgressFill" style="width: 0%; background: linear-gradient(90deg, var(--neon-purple), var(--neon-pink)); height: 100%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Logs Console -->
+                <div class="terminal-logs" style="border: 1px solid var(--border-color); border-radius: 12px; background: #05070c; overflow: hidden; margin-top: 1rem;">
+                    <div class="terminal-header" style="background: #0f131a; padding: 0.4rem 0.75rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">
+                        <span>Console Output</span>
+                        <div class="mac-dots" style="display: flex; gap: 4px;"><span style="width:6px;height:6px;border-radius:50%;background:#ff5f56;"></span><span style="width:6px;height:6px;border-radius:50%;background:#ffbd2e;"></span><span style="width:6px;height:6px;border-radius:50%;background:#27c93f;"></span></div>
+                    </div>
+                    <div class="terminal-body" id="consoleLogs" style="padding: 0.75rem; height: 120px; overflow-y: auto; font-family: var(--font-mono); font-size: 0.75rem; color: #38bdf8; display: flex; flex-direction: column; gap: 0.3rem;">
+                        <p class="system-line">Ready...</p>
+                    </div>
+                </div>
             </div>
             
-            <div class="modal-body">
-                <div class="progress-details">
-                    <div class="progress-info">
-                        <span class="item-index" id="progressIndex">Item 0 of 0</span>
-                        <span class="item-title" id="progressTitle">Current Video Title</span>
-                    </div>
-                    
-                    <!-- Progress Bar -->
-                    <div class="progress-track">
-                        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
-                    </div>
-                    
-                    <div class="progress-stats">
-                        <div class="stat-item">
-                            <span class="label">Progress</span>
-                            <span class="value" id="progressPercent">0%</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="label">Speed</span>
-                            <span class="value" id="progressSpeed">0 KB/s</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="label">ETA</span>
-                            <span class="value" id="progressEta">00:00</span>
-                    </div>
-
-                    <!-- Overall Playlist Progress -->
-                    <div class="playlist-progress-section" style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
-                        <div class="progress-info" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <span class="item-index" style="color: var(--neon-purple);">Total Progress</span>
-                            <span id="totalProgressCount" style="font-size: 0.9rem; font-weight: 600; color: var(--text-secondary);">0 / 0 Completed</span>
-                        </div>
-                        <div class="progress-track" style="height: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 9999px; overflow: hidden;">
-                            <div class="progress-fill" id="totalProgressFill" style="width: 0%; background: linear-gradient(90deg, var(--neon-purple), var(--neon-pink)); box-shadow: 0 0 8px var(--neon-purple); height: 100%;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Console Logs panel -->
-                <div class="terminal-logs">
-                    <div class="terminal-header">
-                        <span>Console Output</span>
-                        <div class="mac-dots">
-                            <span></span><span></span><span></span>
-                        </div>
-                    </div>
-                    <div class="terminal-body" id="consoleLogs">
-                        <p class="system-line">Ready to download...</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="modal-footer">
-                <button class="btn btn-secondary hidden" id="closeModalBtn">Dismiss</button>
-                <button class="btn btn-primary hidden" id="modalOpenFolderBtn">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            <div id="activeJobIdleMessage" class="active-idle-msg" style="text-align: center; padding: 2.5rem 1rem; border: 1px dashed var(--border-color); border-radius: 16px; display: none;">
+                <div class="idle-icon-container" style="margin-bottom: 0.75rem; color: var(--text-muted);">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
                     </svg>
-                    Open Downloads
-                </button>
+                </div>
+                <h4 style="font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">Queue is Idle</h4>
+                <p style="font-size: 0.8rem; color: var(--text-muted);">Paste a playlist link and click Download to start queueing downloads.</p>
             </div>
+
+            <!-- Pending Queue list -->
+            <div class="pending-queue-section" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <h4 style="font-size: 0.9rem; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); padding-bottom: 0.4rem;">Upcoming Playlists</h4>
+                <div class="pending-queue-list" id="pendingQueueList" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 250px; overflow-y: auto;">
+                    <!-- Pending items listed dynamically -->
+                    <div class="empty-queue-msg" style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 1rem 0;">No upcoming jobs</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="drawer-footer" style="padding: 1.25rem 1.5rem; background: rgba(15, 23, 42, 0.4); border-top: 1px solid var(--border-color); display: flex; gap: 0.5rem;">
+            <button class="btn btn-secondary btn-sm" id="drawerOpenFolderBtn" style="width: 100%;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+                Open Downloads Folder
+            </button>
         </div>
     </div>
 
