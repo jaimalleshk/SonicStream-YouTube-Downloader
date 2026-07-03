@@ -1798,7 +1798,7 @@ def load_sync_config() -> dict:
             except Exception:
                 pass
         if not cfg.get("token"):
-            cfg["token"] = secrets.token_hex(4)
+            cfg["token"] = f"{secrets.randbelow(1000000):06d}"
             try:
                 with open(SYNC_CONFIG_FILE, "w", encoding="utf-8") as f:
                     json.dump(cfg, f, indent=2)
@@ -1992,7 +1992,7 @@ async def set_sync_config(req: SyncConfigRequest, request: Request):
         cfg["port"] = req.port
         cfg["cookies_from_browser"] = req.cookies_from_browser or "none"
         if not cfg.get("token"):
-            cfg["token"] = secrets.token_hex(4)
+            cfg["token"] = f"{secrets.randbelow(1000000):06d}"
         with open(SYNC_CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
     return _sync_config_response(cfg)
@@ -2008,7 +2008,7 @@ async def rotate_sync_token(request: Request):
                     cfg.update(json.load(f))
             except Exception:
                 pass
-        cfg["token"] = secrets.token_hex(4)
+        cfg["token"] = f"{secrets.randbelow(1000000):06d}"
         with open(SYNC_CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
     return _sync_config_response(cfg)
