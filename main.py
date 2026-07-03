@@ -1348,7 +1348,10 @@ async def import_playlist(req: ImportFolderRequest):
             "completed_tracks": len(items),
             "pinned": False,
             "deleted": False,
-            "is_playlist": True
+            "is_playlist": True,
+            # Folder imports live in their own folder — without this, Wi-Fi Sync
+            # (and any DOWNLOAD_DIR-based lookup) can't resolve their files.
+            "download_dir": os.path.normpath(req.folder_path)
         }
         history.insert(0, new_job)
         save_history(history)
