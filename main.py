@@ -182,7 +182,7 @@ def run_download_job(job_data: dict):
             "quality": request.quality
         }
         # Remove from pending list
-        queue_state["pending_jobs"] = [j for j in queue_state["pending_jobs"] if j["id"] != job_id]
+        queue_state["pending_jobs"] = [j for j in queue_state["pending_jobs"] if j["job_id"] != job_id]
 
     with progress_lock:
         download_state.update({
