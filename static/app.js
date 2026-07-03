@@ -40,6 +40,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const playerTrackTitle = document.getElementById("playerTrackTitle");
     const playerTrackArtist = document.getElementById("playerTrackArtist");
     const playerTrackStatus = document.getElementById("playerTrackStatus");
+    const playerStatusEq = document.getElementById("playerStatusEq");
+    const playerStatusText = document.getElementById("playerStatusText");
     const playerCurrentTime = document.getElementById("playerCurrentTime");
     const playerProgressBar = document.getElementById("playerProgressBar");
     const playerTotalTime = document.getElementById("playerTotalTime");
@@ -55,6 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // HUD and Terminal Console
     const gridHud = document.getElementById("gridHud");
     const hudJobTitle = document.getElementById("hudJobTitle");
+    const hudCurrentFile = document.getElementById("hudCurrentFile");
     const hudSpeed = document.getElementById("hudSpeed");
     const hudEta = document.getElementById("hudEta");
     const hudProgressCount = document.getElementById("hudProgressCount");
@@ -127,8 +130,10 @@ document.addEventListener("DOMContentLoaded", () => {
             
             // Auto select first active playlist if none active
             if (historyJobs.length > 0 && !currentPlaylistId) {
-                const active = historyJobs.find(job => !job.deleted);
-                if (active) selectPlaylist(active);
+                const active = historyJobs.find(job => !job.deleted && !job.is_virtual && job.is_playlist !== false);
+                if (active) {
+                    selectPlaylist(active);
+                }
             }
             
             renderSidebarList();
@@ -573,7 +578,6 @@ document.addEventListener("DOMContentLoaded", () => {
         sidebarPage = 1;
         renderSidebarList();
     });
-
     // Create Manual Playlist button handler
     btnCreateManual.addEventListener("click", async () => {
         const option = confirm("Click OK to Import files from folder, or Cancel to Create an Empty Playlist.");
@@ -1222,16 +1226,19 @@ document.addEventListener("DOMContentLoaded", () => {
             gridHud.classList.remove("hidden");
             
             if (data.status === "downloading") {
-                hudJobTitle.textContent = `Active Job: #${data.active_job_num} - ${data.current_title}`;
+                hudJobTitle.textContent = data.playlist_title || `Job #${data.active_job_num}`;
+                if (hudCurrentFile) hudCurrentFile.textContent = `↳ ${data.current_title}`;
                 hudSpeed.textContent = data.speed;
                 hudEta.textContent = data.eta;
             } else if (data.status === "completed") {
-                hudJobTitle.textContent = `Completed Job #${data.active_job_num}`;
+                hudJobTitle.textContent = `Completed: ${data.playlist_title || 'Job #' + data.active_job_num}`;
+                if (hudCurrentFile) hudCurrentFile.textContent = "";
                 hudSpeed.textContent = "--";
                 hudEta.textContent = "--";
                 loadSidebar();
             } else if (data.status === "failed") {
-                hudJobTitle.textContent = `Failed Job #${data.active_job_num}`;
+                hudJobTitle.textContent = `Failed: ${data.playlist_title || 'Job #' + data.active_job_num}`;
+                if (hudCurrentFile) hudCurrentFile.textContent = "";
                 hudSpeed.textContent = "--";
                 hudEta.textContent = "--";
             }
@@ -1346,7 +1353,11 @@ document.addEventListener("DOMContentLoaded", () => {
             playerAudioArtPanel.style.display = "flex";
         }
         
-        playerTrackStatus.innerHTML = `<span class="equalizer-bar" style="width: 2px; height: 8px; background: var(--neon-blue); display: inline-block;"></span> Loading...`;
+        if (playerStatusEq) {
+            playerStatusEq.style.visibility = "hidden";
+            playerStatusEq.classList.remove("playing");
+        }
+        if (playerStatusText) playerStatusText.textContent = "Loading...";
         
         try {
             const streamUrl = `/api/media/stream?video_url=${encodeURIComponent(track.url)}&title=${encodeURIComponent(track.title)}&format=${format}&download_dir=${encodeURIComponent(downloadDir)}`;
@@ -1358,17 +1369,20 @@ document.addEventListener("DOMContentLoaded", () => {
             isPlaying = true;
             updatePlayBtnUI();
             
-            playerTrackStatus.innerHTML = `
-                <span class="equalizer-bar" style="width: 2px; height: 8px; background: var(--neon-blue); display: inline-block;"></span>
-                <span class="equalizer-bar" style="width: 2px; height: 8px; background: var(--neon-blue); display: inline-block; animation-delay: 0.15s;"></span>
-                <span class="equalizer-bar" style="width: 2px; height: 8px; background: var(--neon-blue); display: inline-block; animation-delay: 0.3s;"></span>
-                Playing
-            `;
+            if (playerStatusEq) {
+                playerStatusEq.style.visibility = "visible";
+                playerStatusEq.classList.add("playing");
+            }
+            if (playerStatusText) playerStatusText.textContent = "Playing";
 
             savePlaybackPosition(track.id, shuffleIndex, shuffleOrder);
         } catch (err) {
             console.error("Playback failed:", err);
-            playerTrackStatus.textContent = "Error Playing File";
+            if (playerStatusEq) {
+                playerStatusEq.style.visibility = "hidden";
+                playerStatusEq.classList.remove("playing");
+            }
+            if (playerStatusText) playerStatusText.textContent = "Error Playing File";
             isPlaying = false;
             updatePlayBtnUI();
         }
@@ -1565,12 +1579,16 @@ document.addEventListener("DOMContentLoaded", () => {
             
             if (pauseSecs > 0) {
                 let count = pauseSecs;
-                playerTrackStatus.textContent = `Pause (${count}s)...`;
+                if (playerStatusEq) {
+                    playerStatusEq.style.visibility = "hidden";
+                    playerStatusEq.classList.remove("playing");
+                }
+                if (playerStatusText) playerStatusText.textContent = `Pause (${count}s)...`;
                 
                 nextTrackCountdownInterval = setInterval(() => {
                     count--;
                     if (count > 0) {
-                        playerTrackStatus.textContent = `Pause (${count}s)...`;
+                        if (playerStatusText) playerStatusText.textContent = `Pause (${count}s)...`;
                     } else {
                         clearInterval(nextTrackCountdownInterval);
                         nextTrackCountdownInterval = null;
@@ -1992,6 +2010,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnExportManifest = document.getElementById("btnExportManifest");
     const syncManifestStatus = document.getElementById("syncManifestStatus");
     const syncRestartNote = document.getElementById("syncRestartNote");
+    const syncCookiesInput = document.getElementById("syncCookiesInput");
 
     function renderSyncConfig(cfg) {
         if (!syncEnabledToggle) return;
@@ -2002,6 +2021,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const ip = (cfg.lan_ips && cfg.lan_ips[0]) || null;
         syncAddressText.textContent = cfg.enabled && ip ? `http://${ip}:${cfg.port}` : (cfg.enabled ? "no network detected" : "disabled");
         syncRestartNote.classList.toggle("hidden", !cfg.restart_required);
+        if (syncCookiesInput) {
+            syncCookiesInput.value = cfg.cookies_from_browser || "none";
+        }
     }
 
     async function loadSyncConfig() {
@@ -2014,12 +2036,14 @@ document.addEventListener("DOMContentLoaded", () => {
     async function saveSyncConfig() {
         if (!syncEnabledToggle) return;
         try {
+            const cookies_from_browser = syncCookiesInput ? syncCookiesInput.value : "none";
             const res = await fetch("/api/sync/config", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     enabled: syncEnabledToggle.checked,
-                    port: parseInt(syncPortInput.value, 10) || 8765
+                    port: parseInt(syncPortInput.value, 10) || 8765,
+                    cookies_from_browser: cookies_from_browser
                 })
             });
             if (res.ok) {
@@ -2037,6 +2061,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btnOpenSettings) btnOpenSettings.addEventListener("click", loadSyncConfig);
     if (btnSaveSettings) btnSaveSettings.addEventListener("click", saveSyncConfig);
     if (syncEnabledToggle) syncEnabledToggle.addEventListener("change", saveSyncConfig);
+    if (syncCookiesInput) syncCookiesInput.addEventListener("change", saveSyncConfig);
 
     if (btnCopySyncToken) {
         btnCopySyncToken.addEventListener("click", async () => {

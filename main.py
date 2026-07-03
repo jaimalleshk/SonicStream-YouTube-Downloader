@@ -39,6 +39,7 @@ download_state = {
     "current_index": 0,
     "total_files": 0,
     "current_title": "",
+    "playlist_title": "",
     "percentage": 0.0,
     "speed": "0 KB/s",
     "eta": "00:00",
@@ -396,6 +397,7 @@ def run_download_job(job_data: dict):
             "current_index": 0,
             "total_files": len(request.items),
             "current_title": "",
+            "playlist_title": job_data["title"],
             "percentage": 0.0,
             "speed": "0 KB/s",
             "eta": "00:00",
@@ -750,49 +752,116 @@ async def start_download(req: DownloadRequest):
             req_queued = copy.copy(req)
             req_queued.items = delta_items
         else:
-            # Create a brand new job entry
-            max_job_num = 0
-            for h_item in history:
-                if "job_num" in h_item:
-                    max_job_num = max(max_job_num, h_item["job_num"])
-            new_job_num = max_job_num + 1
+            is_playlist_download = len(req.items) > 1 or req.playlist_url is not None
             
-            new_entry = {
-                "id": job_id,
-                "job_num": new_job_num,
-                "title": title,
-                "url": url,
-                "timestamp": timestamp,
-                "total_tracks": len(req.items),
-                "completed_tracks": 0,
-                "success_count": 0,
-                "failure_count": 0,
-                "is_playlist": len(req.items) > 1 or req.playlist_url is not None,
-                "format": req.format,
-                "quality": req.quality,
-                "download_dir": target_dir,
-                "pinned": False,
-                "items": [
-                    {
-                        "id": item.id,
-                        "title": item.title,
-                        "uploader": item.uploader or "Unknown",
-                        "duration": item.duration or 0,
-                        "thumbnail": item.thumbnail,
-                        "url": item.url,
-                        "status": "queued",
-                        "percentage": 0.0,
-                        "speed": "--",
-                        "start_time": "--",
-                        "end_time": "--",
-                        "error_detail": ""
+            if not is_playlist_download:
+                # Single-track download: route into persistent "Individual Downloads" playlist
+                individual_job = None
+                for h_item in history:
+                    if h_item.get("id") == "individual_downloads":
+                        individual_job = h_item
+                        break
+                
+                if not individual_job:
+                    individual_job = {
+                        "id": "individual_downloads",
+                        "job_num": 0,
+                        "title": "Individual Downloads",
+                        "url": "",
+                        "format": "audio",
+                        "quality": "highest",
+                        "items": [],
+                        "total_tracks": 0,
+                        "success_count": 0,
+                        "failure_count": 0,
+                        "completed_tracks": 0,
+                        "pinned": False,
+                        "deleted": False,
+                        "is_playlist": True
                     }
-                    for item in req.items
-                ]
-            }
-            history.insert(0, new_entry)
-            save_history(history)
-            req_queued = req
+                    history.append(individual_job)
+                
+                job_id = "individual_downloads"
+                new_job_num = individual_job.get("job_num", 0)
+                title = "Individual Downloads"
+                
+                existing_ids = {it.get("id") for it in individual_job.get("items", [])}
+                for item in req.items:
+                    if item.id not in existing_ids:
+                        individual_job.setdefault("items", []).append({
+                            "id": item.id,
+                            "title": item.title,
+                            "uploader": item.uploader or "Unknown",
+                            "duration": item.duration or 0,
+                            "thumbnail": item.thumbnail,
+                            "url": item.url,
+                            "status": "queued",
+                            "percentage": 0.0,
+                            "speed": "--",
+                            "start_time": "--",
+                            "end_time": "--",
+                            "error_detail": ""
+                        })
+                    else:
+                        # Re-queue if not completed
+                        for existing_item in individual_job.get("items", []):
+                            if existing_item.get("id") == item.id and existing_item.get("status") not in ["completed", "skipped"]:
+                                existing_item["status"] = "queued"
+                                existing_item["percentage"] = 0.0
+                                existing_item["speed"] = "--"
+                                existing_item["start_time"] = "--"
+                                existing_item["end_time"] = "--"
+                                existing_item["error_detail"] = ""
+                
+                individual_job["total_tracks"] = len(individual_job.get("items", []))
+                individual_job["format"] = req.format
+                individual_job["quality"] = req.quality
+                save_history(history)
+                req_queued = req
+            else:
+                # Create a brand new playlist job entry
+                max_job_num = 0
+                for h_item in history:
+                    if "job_num" in h_item:
+                        max_job_num = max(max_job_num, h_item["job_num"])
+                new_job_num = max_job_num + 1
+                
+                new_entry = {
+                    "id": job_id,
+                    "job_num": new_job_num,
+                    "title": title,
+                    "url": url,
+                    "timestamp": timestamp,
+                    "total_tracks": len(req.items),
+                    "completed_tracks": 0,
+                    "success_count": 0,
+                    "failure_count": 0,
+                    "is_playlist": True,
+                    "format": req.format,
+                    "quality": req.quality,
+                    "download_dir": target_dir,
+                    "pinned": False,
+                    "items": [
+                        {
+                            "id": item.id,
+                            "title": item.title,
+                            "uploader": item.uploader or "Unknown",
+                            "duration": item.duration or 0,
+                            "thumbnail": item.thumbnail,
+                            "url": item.url,
+                            "status": "queued",
+                            "percentage": 0.0,
+                            "speed": "--",
+                            "start_time": "--",
+                            "end_time": "--",
+                            "error_detail": ""
+                        }
+                        for item in req.items
+                    ]
+                }
+                history.insert(0, new_entry)
+                save_history(history)
+                req_queued = req
 
     # Sort items so that shorter tracks are downloaded first, and larger/longer tracks are downloaded last!
     if req_queued.items:
@@ -841,6 +910,7 @@ async def get_progress_stream():
                 curr_idx = download_state["current_index"]
                 percent = download_state["percentage"]
                 title = download_state["current_title"]
+                playlist_title = download_state["playlist_title"]
                 speed = download_state["speed"]
                 eta = download_state["eta"]
                 logs = list(download_state["logs"])
@@ -854,6 +924,7 @@ async def get_progress_stream():
                 "current_index": curr_idx,
                 "total_files": total,
                 "current_title": title,
+                "playlist_title": playlist_title,
                 "percentage": percent,
                 "speed": speed,
                 "eta": eta,
@@ -907,31 +978,55 @@ async def get_history():
             "is_virtual": True
         }
 
-        # 1.5. Compute union of all tracks for "Individual Downloads" (is_playlist = False)
-        individual_tracks = []
+        # 1.5. Find or create persistent "Individual Downloads" playlist
+        individual_downloads_job = None
         for job in history:
-            if job.get("deleted") or job.get("id") == "deleted_tracks":
+            if job.get("id") == "individual_downloads":
+                individual_downloads_job = job
+                break
+        
+        if not individual_downloads_job:
+            individual_downloads_job = {
+                "id": "individual_downloads",
+                "job_num": 0,
+                "title": "Individual Downloads",
+                "url": "",
+                "format": "audio",
+                "quality": "highest",
+                "items": [],
+                "total_tracks": 0,
+                "success_count": 0,
+                "failure_count": 0,
+                "completed_tracks": 0,
+                "pinned": False,
+                "deleted": False,
+                "is_playlist": True
+            }
+            history.append(individual_downloads_job)
+            save_history(history)
+        
+        # Migrate any old single-track jobs into Individual Downloads playlist
+        jobs_to_remove = []
+        for job in history:
+            if job.get("deleted") or job.get("id") in ["deleted_tracks", "individual_downloads"]:
                 continue
             if job.get("is_playlist") is False:
                 for item in job.get("items", []):
-                    individual_tracks.append(item)
-                    
-        individual_downloads_job = {
-            "id": "individual_downloads",
-            "job_num": 0,
-            "title": "Individual Downloads",
-            "url": "",
-            "format": "audio",
-            "quality": "highest",
-            "items": individual_tracks,
-            "total_tracks": len(individual_tracks),
-            "success_count": sum(1 for t in individual_tracks if t.get("status") in ["completed", "skipped"]),
-            "failure_count": sum(1 for t in individual_tracks if t.get("status") == "error"),
-            "completed_tracks": len(individual_tracks),
-            "pinned": False,
-            "deleted": False,
-            "is_virtual": True
-        }
+                    # Check for duplicates before appending
+                    existing_ids = {it.get("id") for it in individual_downloads_job.get("items", [])}
+                    if item.get("id") not in existing_ids:
+                        individual_downloads_job.setdefault("items", []).append(item)
+                jobs_to_remove.append(job.get("id"))
+        
+        if jobs_to_remove:
+            history = [j for j in history if j.get("id") not in jobs_to_remove]
+            # Re-compute counts for individual_downloads_job
+            items = individual_downloads_job.get("items", [])
+            individual_downloads_job["total_tracks"] = len(items)
+            individual_downloads_job["success_count"] = sum(1 for t in items if t.get("status") in ["completed", "skipped"])
+            individual_downloads_job["failure_count"] = sum(1 for t in items if t.get("status") == "error")
+            individual_downloads_job["completed_tracks"] = len(items)
+            save_history(history)
         
         # 2. Find or synthesize "Deleted Tracks"
         deleted_tracks_job = None
@@ -960,7 +1055,7 @@ async def get_history():
             history.append(deleted_tracks_job)
             save_history(history)
             
-        return [all_downloads_job, individual_downloads_job] + history
+        return [all_downloads_job] + history
 
 @app.post("/api/history/clear")
 async def clear_history():

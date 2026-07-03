@@ -83,12 +83,14 @@ body {
 }
 
 /* Container & Header */
-.container {
+.app-container {
     width: 100%;
-    max-width: 1100px;
+    max-width: 100%;
     margin: 0 auto;
     padding: 0.75rem 1.5rem;
     z-index: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 header {
@@ -189,6 +191,11 @@ header {
 .hero-section {
     text-align: center;
     background: radial-gradient(circle at top right, rgba(0, 168, 255, 0.05), transparent 60%), var(--card-bg);
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 1.5rem;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
 }
 
 .hero-section h1 {
@@ -1238,6 +1245,10 @@ input[type="checkbox"]:checked::before {
 
 .equalizer-bar {
     animation: equalizerGlow 0.8s ease-in-out infinite;
+    animation-play-state: paused;
+}
+.playing .equalizer-bar {
+    animation-play-state: running;
 }
 .equalizer-bar:nth-child(2) {
     animation-delay: 0.15s;
@@ -1364,6 +1375,51 @@ th {
     box-sizing: border-box;
 }
 
+/* Dashboard Grid Layout */
+.dashboard-layout {
+    display: grid;
+    grid-template-columns: 2.5fr 7.5fr;
+    gap: 1.25rem;
+    margin-top: 1.25rem;
+    width: 100%;
+}
 
+/* Responsive Media Queries */
+@media (max-width: 992px) {
+    .dashboard-layout {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    .hero-section {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+}
 
+@media (max-width: 576px) {
+    header {
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: flex-start;
+    }
+}
+
+/* Active Job HUD (above playlist grid) */
+.active-job-hud {
+    background: rgba(0, 242, 254, 0.04);
+    border: 1px solid rgba(0, 242, 254, 0.15);
+    border-top: 2px solid rgba(0, 242, 254, 0.3);
+    border-radius: 8px;
+    padding: 0.65rem 0.85rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.active-job-hud.hidden {
+    display: none;
+}
 

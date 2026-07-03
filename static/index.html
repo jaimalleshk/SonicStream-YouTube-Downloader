@@ -38,13 +38,6 @@
             </div>
 
             <div class="header-actions" style="display: flex; align-items: center; gap: 0.75rem;">
-                <button class="btn btn-secondary open-folder-btn" id="historyBtn">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"/>
-                        <polyline points="12 6 12 12 16 14"/>
-                    </svg>
-                    History
-                </button>
                 <button class="btn btn-secondary open-folder-btn" id="btnOpenSettings" title="Settings">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="3"/>
@@ -57,8 +50,8 @@
 
         <!-- Main Content -->
         <main>
-            <!-- Hero / Input Panel (Compacted to two-column grid) -->
-            <section class="card hero-section" style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 1.5rem; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem;">
+            <!-- Hero / Input Panel -->
+            <section class="card hero-section">
                 <!-- Left Column: URL input -->
                 <div style="display: flex; flex-direction: column; gap: 0.75rem; text-align: left; justify-content: center;">
 
@@ -79,7 +72,7 @@
                 </div>
 
                 <!-- Right Column: Universal Media Player Panel -->
-                <div id="playerControlsContainer" style="border: 1px solid var(--border-color); border-radius: 12px; display: flex; flex-direction: column; background: rgba(0,0,0,0.25); padding: 0.65rem; min-height: 120px; position: relative;">
+                <div id="playerControlsContainer" style="border: 1px solid var(--border-color); border-radius: 12px; display: flex; flex-direction: column; background: rgba(0,0,0,0.25); padding: 0.65rem; height: 168px; position: relative;">
                     <!-- Video Output Element (Plays videos; hidden in audio mode) -->
                     <video id="playerVideo" style="display: none; width: 100%; height: 90px; object-fit: contain; border-radius: 6px; background: #000; margin-bottom: 0.35rem;"></video>
                     
@@ -89,9 +82,13 @@
                         <div style="display: flex; flex-direction: column; justify-content: center; flex-grow: 1; min-width: 0; text-align: left;">
                             <div id="playerTrackTitle" style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Not Playing</div>
                             <div id="playerTrackArtist" style="font-size: 0.7rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 0.1rem;">No Media Active</div>
-                            <div id="playerTrackStatus" style="font-size: 0.65rem; color: var(--neon-blue); font-weight: 600; margin-top: 0.25rem; display: flex; align-items: center; gap: 0.25rem;">
-                                <span class="equalizer-bar" style="width: 2px; height: 8px; background: var(--neon-blue); display: inline-block;"></span>
-                                Ready
+                            <div id="playerTrackStatus" style="font-size: 1.3rem; color: var(--neon-blue); font-weight: 600; margin-top: 0.25rem; display: flex; align-items: center; gap: 0.35rem; height: 22px;">
+                                <div id="playerStatusEq" style="display: flex; gap: 2px; align-items: flex-end; width: 14px; height: 10px; visibility: hidden;">
+                                    <span class="equalizer-bar" style="width: 2px; height: 6px; background: var(--neon-blue); display: inline-block;"></span>
+                                    <span class="equalizer-bar" style="width: 2px; height: 6px; background: var(--neon-blue); display: inline-block;"></span>
+                                    <span class="equalizer-bar" style="width: 2px; height: 6px; background: var(--neon-blue); display: inline-block;"></span>
+                                </div>
+                                <span id="playerStatusText">Ready</span>
                             </div>
                         </div>
                     </div>
@@ -141,10 +138,10 @@
             </section>
 
             <!-- Dual Panel Dashboard -->
-            <div class="dashboard-layout" style="display: grid; grid-template-columns: 2.5fr 7.5fr; gap: 1.25rem; margin-top: 1.25rem;">
+            <div class="dashboard-layout">
                 
                 <!-- Left Panel: Playlist Explorer (Sidebar) -->
-                <section class="card playlist-sidebar" style="display: flex; flex-direction: column; padding: 1rem; min-height: 480px;">
+                <section class="card playlist-sidebar" style="display: flex; flex-direction: column; padding: 1rem; align-self: stretch;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
                         <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin: 0;">Playlists</h3>
                         <button id="btnCreateManual" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-radius: 6px; display: flex; align-items: center; gap: 0.25rem;" title="Create Playlist from own folder">
@@ -161,7 +158,7 @@
                     </div>
                     
                     <!-- Playlist Explorer List Box -->
-                    <div id="playlistListContainer" style="flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; max-height: 380px; padding-right: 4px;">
+                    <div id="playlistListContainer" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; padding-right: 4px;">
                         <!-- Playlist Rows injected here -->
                     </div>
                     
@@ -174,7 +171,24 @@
                 </section>
                 
                 <!-- Right Panel: Playlist Items Grid -->
-                <section class="card playlist-items-panel" id="playlistSection" style="display: flex; flex-direction: column; padding: 1.25rem;">
+                <div style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0;">
+                    <!-- Active Job HUD (above playlist grid, distinct background) -->
+                    <div id="gridHud" class="active-job-hud hidden">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 0; flex: 1;">
+                            <div class="pulse-ring" style="width: 8px; height: 8px;"></div>
+                            <div style="display: flex; flex-direction: column; min-width: 0;">
+                                <span style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="hudJobTitle">Active Job: None</span>
+                                <span style="font-size: 0.75rem; color: var(--neon-blue); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="hudCurrentFile"></span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: var(--text-secondary); flex-shrink: 0;">
+                            <div>Speed: <span id="hudSpeed" style="font-weight: 700; color: var(--neon-blue); font-family: var(--font-mono);">--</span></div>
+                            <div>ETA: <span id="hudEta" style="font-weight: 700; color: var(--neon-blue); font-family: var(--font-mono);">--</span></div>
+                            <div>Overall: <span id="hudProgressCount" style="font-weight: 700; color: var(--neon-blue); font-family: var(--font-mono);">0 / 0</span></div>
+                        </div>
+                    </div>
+
+                    <section class="card playlist-items-panel" id="playlistSection" style="display: flex; flex-direction: column; padding: 1.25rem; flex-grow: 1;">
                     <!-- Playlist Title Header & Actions -->
                     <div class="playlist-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
                         <div>
@@ -185,35 +199,22 @@
                         <!-- Grid Header Controls -->
                         <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                             <!-- Sync/Refresh Playlist button -->
-                            <button id="refreshPlaylistBtn" class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px; display: flex; align-items: center; gap: 0.35rem;" title="Query YouTube for new uploads and download them">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <button id="refreshPlaylistBtn" class="btn btn-secondary" style="padding: 0.45rem 0.8rem; font-size: 0.85rem; border-radius: 6px; display: flex; align-items: center; gap: 0.35rem;" title="Query YouTube for new uploads and download them">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                                 </svg>
                                 Sync YouTube
                             </button>
                             
-                            <button id="selectAllBtn" class="btn btn-secondary btn-sm" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px;">Select All</button>
-                            <button id="deselectAllBtn" class="btn btn-secondary btn-sm" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px;">Deselect All</button>
+                            <button id="selectAllBtn" class="btn btn-secondary btn-sm" style="padding: 0.45rem 0.8rem; font-size: 0.85rem; border-radius: 6px;">Select All</button>
+                            <button id="deselectAllBtn" class="btn btn-secondary btn-sm" style="padding: 0.45rem 0.8rem; font-size: 0.85rem; border-radius: 6px;">Deselect All</button>
                             
-                            <button id="downloadBtn" class="btn btn-primary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px; display: flex; align-items: center; gap: 0.35rem;">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <button id="downloadBtn" class="btn btn-primary" style="padding: 0.45rem 0.8rem; font-size: 0.85rem; border-radius: 6px; display: flex; align-items: center; gap: 0.35rem;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
                                 </svg>
                                 <span>Download Selected</span>
                             </button>
-                        </div>
-                    </div>
-
-                    <!-- Top HUD for progress updates -->
-                    <div id="gridHud" class="grid-hud hidden" style="background: rgba(255, 255, 255, 0.01); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <div class="pulse-ring" style="width: 8px; height: 8px;"></div>
-                            <span style="font-weight: 700; font-size: 0.8rem; color: var(--text-primary);" id="hudJobTitle">Active Job: None</span>
-                        </div>
-                        <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.75rem;">
-                            <div>Speed: <span id="hudSpeed" style="font-weight: 700; color: var(--neon-blue); font-family: var(--font-mono);">--</span></div>
-                            <div>ETA: <span id="hudEta" style="font-weight: 700; color: var(--neon-blue); font-family: var(--font-mono);">--</span></div>
-                            <div>Overall: <span id="hudProgressCount" style="font-weight: 700; color: var(--neon-purple); font-family: var(--font-mono);">0 / 0</span></div>
                         </div>
                     </div>
                     
@@ -274,6 +275,7 @@
                         </div>
                     </div>
                 </section>
+            </div>
                 
             </div>
         </main>
@@ -362,7 +364,7 @@
                 <button id="btnCloseSettings" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.25rem; font-weight: bold; line-height: 1;">&times;</button>
             </div>
             
-            <div class="modal-body" style="display: flex; flex-direction: column; gap: 1.25rem; text-align: left; padding: 1.5rem;">
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 1.25rem; text-align: left; padding: 1.5rem; max-height: 420px; overflow-y: auto;">
                 <!-- Section: Download Format & Quality -->
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                     <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--neon-blue); text-transform: uppercase; margin-bottom: 0.25rem;">Download Format & Quality</h4>
@@ -487,6 +489,17 @@
                 <!-- Section: Engine Health -->
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                     <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--neon-blue); text-transform: uppercase; margin-bottom: 0.25rem;">Engine Health (yt-dlp)</h4>
+                    
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.25rem;">
+                        <span>Use Browser Cookies:</span>
+                        <select id="syncCookiesInput" style="background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 2px 4px; font-size: 0.8rem; outline: none; cursor: pointer; font-family: var(--font-sans);">
+                            <option value="none">None (Default)</option>
+                            <option value="chrome">Chrome</option>
+                            <option value="edge">Edge</option>
+                            <option value="firefox">Firefox</option>
+                            <option value="brave">Brave</option>
+                        </select>
+                    </div>
                     
                     <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem;">
                         <span>Installed Version:</span>
