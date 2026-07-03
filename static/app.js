@@ -399,7 +399,8 @@ document.addEventListener("DOMContentLoaded", () => {
             row.className = "playlist-row";
             row.setAttribute("data-id", item.id);
             
-            const jobDisplay = state.job_num !== "--" ? `#${state.job_num}` : "--";
+            const activeTitle = playlistTitle.textContent || "Download";
+            const jobDisplay = state.job_num !== "--" ? `#${state.job_num} - ${activeTitle}` : "--";
             const speedDisplay = state.speed !== "0 KB/s" ? state.speed : "--";
             
             const isPlayable = (state.status === "completed" || state.status === "skipped");
@@ -414,7 +415,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <td class="title-cell" title="${item.title}">${item.title}</td>
                 <td class="channel-cell">${item.uploader}</td>
                 <td class="duration-cell">${formatDuration(item.duration)}</td>
-                <td class="job-cell" id="job-${item.id}">${jobDisplay}</td>
+                <td class="job-cell" id="job-${item.id}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;" title="${jobDisplay}">${jobDisplay}</td>
                 <td class="status-cell" id="status-col-${item.id}">
                     <div class="cell-progress-container">
                         <span id="percent-val-${item.id}" style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono);">${state.percentage}%</span>
@@ -519,7 +520,7 @@ document.addEventListener("DOMContentLoaded", () => {
         
         let bytesPerSec = 0.024 * 1024 * 1024;
         if (format === "audio") {
-            const rates = { low: 0.008, medium: 0.016, high: 0.024, highest: 0.04 };
+            const rates = { low: 0.008, medium: 0.016, font: 0.024, high: 0.024, highest: 0.04 };
             bytesPerSec = (rates[quality] || 0.024) * 1024 * 1024;
         } else {
             const rates = { low: 0.05, medium: 0.1, high: 0.2, highest: 0.4 };
@@ -548,7 +549,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function getSelectedItems() {
         const checkedCheckboxes = document.querySelectorAll(".video-checkbox:checked");
-        const selectedIds = Array.from(checkedCheckboxes).map(cb => dataId => cb.getAttribute("data-id"));
         const actualIds = Array.from(checkedCheckboxes).map(cb => cb.getAttribute("data-id"));
         return playlistItems.filter(item => actualIds.includes(item.id));
     }
@@ -776,7 +776,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     const detailCell = document.getElementById(`status-detail-${id}`);
                     const errorCell = document.getElementById('error-' + id);
 
-                    if (jobCell) jobCell.textContent = itemState.job_num !== "--" ? `#${itemState.job_num}` : "--";
+                    if (jobCell) {
+                        const activeTitle = playlistTitle.textContent || "Download";
+                        const jobDisplay = itemState.job_num !== "--" ? `#${itemState.job_num} - ${activeTitle}` : "--";
+                        jobCell.textContent = jobDisplay;
+                        jobCell.title = jobDisplay;
+                    }
                     if (percentCell) percentCell.textContent = `${itemState.percentage}%`;
                     if (fillCell) fillCell.style.width = `${itemState.percentage}%`;
                     if (speedCell) speedCell.textContent = itemState.speed !== "0 KB/s" ? itemState.speed : "--";
@@ -956,10 +961,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const successCount = item.success_count || 0;
             const failureCount = item.failure_count || 0;
             
-            const jobNumDisplay = item.job_num ? `#${item.job_num}` : "--";
+            const jobNumDisplay = item.job_num ? `#${item.job_num} - ${item.title}` : "--";
 
             row.innerHTML = `
-                <td class="job-cell">${jobNumDisplay}</td>
+                <td class="job-cell" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;" title="${jobNumDisplay}">${jobNumDisplay}</td>
                 <td><span class="history-badge ${typeClass}">${typeLabel}</span></td>
                 <td style="font-weight: 600; color: var(--text-primary);" title="${item.title}">${item.title}</td>
                 <td class="duration-cell" style="text-align: center;">${item.total_tracks}</td>
