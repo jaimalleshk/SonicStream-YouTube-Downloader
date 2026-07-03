@@ -440,7 +440,50 @@
                 </div>
                 
                 <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0.25rem 0;">
-                
+
+                <!-- Section: Wi-Fi Sync (iPhone companion app) -->
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--neon-blue); text-transform: uppercase; margin-bottom: 0.25rem;">Wi-Fi Sync (iPhone)</h4>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem;">
+                        <span>Enable Wi-Fi Sync:</span>
+                        <input type="checkbox" id="syncEnabledToggle" style="width: 16px; height: 16px; accent-color: var(--neon-blue); cursor: pointer;">
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem;">
+                        <span>Port:</span>
+                        <input type="number" id="syncPortInput" value="8765" min="1024" max="65535" style="width: 70px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 2px 4px; font-size: 0.8rem; text-align: center; font-family: var(--font-mono); outline: none;">
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem;">
+                        <span>Server Address:</span>
+                        <span id="syncAddressText" style="font-family: var(--font-mono); font-weight: 700; color: var(--text-primary);">—</span>
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; gap: 0.5rem;">
+                        <span>Pairing Token:</span>
+                        <div style="display: flex; align-items: center; gap: 0.35rem; min-width: 0;">
+                            <span id="syncTokenText" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px;">—</span>
+                            <button id="btnCopySyncToken" class="btn btn-secondary" title="Copy token" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-radius: 6px;">Copy</button>
+                            <button id="btnRotateSyncToken" class="btn btn-secondary" title="Generate a new token (re-pair the iPhone afterwards)" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-radius: 6px;">Rotate</button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; margin-top: 0.25rem;">
+                        <span id="syncManifestStatus" style="font-size: 0.7rem; color: var(--text-muted);"></span>
+                        <button id="btnExportManifest" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.7rem; border-radius: 6px;">Export Manifest to Downloads Folder</button>
+                    </div>
+
+                    <p id="syncRestartNote" class="hidden" style="font-size: 0.65rem; color: #ffb74d; margin: 0; line-height: 1.4;">
+                        Restart SonicStream to apply the new Wi-Fi Sync setting. Windows Firewall may ask once to allow access on private networks.
+                    </p>
+                    <p style="font-size: 0.65rem; color: var(--text-muted); margin: 0; line-height: 1.4;">
+                        Lets the iPhone MusicApp pull playlists and songs over your home Wi-Fi. Enter the server address and pairing token in the iPhone app's Sync settings.
+                    </p>
+                </div>
+
+                <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0.25rem 0;">
+
                 <!-- Section: Engine Health -->
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                     <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--neon-blue); text-transform: uppercase; margin-bottom: 0.25rem;">Engine Health (yt-dlp)</h4>

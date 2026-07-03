@@ -1982,6 +1982,103 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // --- Wi-Fi Sync (iPhone) settings section ---
+    const syncEnabledToggle = document.getElementById("syncEnabledToggle");
+    const syncPortInput = document.getElementById("syncPortInput");
+    const syncAddressText = document.getElementById("syncAddressText");
+    const syncTokenText = document.getElementById("syncTokenText");
+    const btnCopySyncToken = document.getElementById("btnCopySyncToken");
+    const btnRotateSyncToken = document.getElementById("btnRotateSyncToken");
+    const btnExportManifest = document.getElementById("btnExportManifest");
+    const syncManifestStatus = document.getElementById("syncManifestStatus");
+    const syncRestartNote = document.getElementById("syncRestartNote");
+
+    function renderSyncConfig(cfg) {
+        if (!syncEnabledToggle) return;
+        syncEnabledToggle.checked = !!cfg.enabled;
+        syncPortInput.value = cfg.port || 8765;
+        syncTokenText.textContent = cfg.token || "—";
+        syncTokenText.title = cfg.token || "";
+        const ip = (cfg.lan_ips && cfg.lan_ips[0]) || null;
+        syncAddressText.textContent = cfg.enabled && ip ? `http://${ip}:${cfg.port}` : (cfg.enabled ? "no network detected" : "disabled");
+        syncRestartNote.classList.toggle("hidden", !cfg.restart_required);
+    }
+
+    async function loadSyncConfig() {
+        try {
+            const res = await fetch("/api/sync/config");
+            if (res.ok) renderSyncConfig(await res.json());
+        } catch (e) { /* section stays inert if unavailable */ }
+    }
+
+    async function saveSyncConfig() {
+        if (!syncEnabledToggle) return;
+        try {
+            const res = await fetch("/api/sync/config", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    enabled: syncEnabledToggle.checked,
+                    port: parseInt(syncPortInput.value, 10) || 8765
+                })
+            });
+            if (res.ok) {
+                const cfg = await res.json();
+                renderSyncConfig(cfg);
+                if (cfg.restart_required) {
+                    logToTerminal("[Wi-Fi Sync] Setting saved — restart SonicStream to apply.");
+                }
+            }
+        } catch (e) {
+            logToTerminal("[Wi-Fi Sync] Failed to save settings: " + e.message);
+        }
+    }
+
+    if (btnOpenSettings) btnOpenSettings.addEventListener("click", loadSyncConfig);
+    if (btnSaveSettings) btnSaveSettings.addEventListener("click", saveSyncConfig);
+    if (syncEnabledToggle) syncEnabledToggle.addEventListener("change", saveSyncConfig);
+
+    if (btnCopySyncToken) {
+        btnCopySyncToken.addEventListener("click", async () => {
+            try {
+                await navigator.clipboard.writeText(syncTokenText.textContent || "");
+                btnCopySyncToken.textContent = "Copied!";
+                setTimeout(() => { btnCopySyncToken.textContent = "Copy"; }, 1500);
+            } catch (e) { /* clipboard unavailable in some webview contexts */ }
+        });
+    }
+
+    if (btnRotateSyncToken) {
+        btnRotateSyncToken.addEventListener("click", async () => {
+            if (!confirm("Generate a new pairing token? The iPhone app will need to be re-paired.")) return;
+            try {
+                const res = await fetch("/api/sync/rotate-token", { method: "POST" });
+                if (res.ok) {
+                    renderSyncConfig(await res.json());
+                    logToTerminal("[Wi-Fi Sync] Pairing token rotated — update the iPhone app.");
+                }
+            } catch (e) { /* ignore */ }
+        });
+    }
+
+    if (btnExportManifest) {
+        btnExportManifest.addEventListener("click", async () => {
+            syncManifestStatus.textContent = "Exporting…";
+            try {
+                const res = await fetch("/api/sync/export-manifest", { method: "POST" });
+                if (res.ok) {
+                    const data = await res.json();
+                    syncManifestStatus.textContent = `Exported ${data.playlists} playlist(s)`;
+                    logToTerminal("[Wi-Fi Sync] Manifest exported to " + data.path);
+                } else {
+                    syncManifestStatus.textContent = "Export failed";
+                }
+            } catch (e) {
+                syncManifestStatus.textContent = "Export failed";
+            }
+        });
+    }
+
     // yt-dlp version check and update
     async function checkYtdlpVersion() {
         const currentEl = document.getElementById("ytdlpCurrentVersion");

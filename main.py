@@ -1855,6 +1855,87 @@ async def sync_export_manifest(request: Request):
         json.dump(manifest, f, ensure_ascii=False, indent=2)
     return {"message": "Manifest exported", "path": out_path, "playlists": len(manifest["playlists"])}
 
+# --- Wi-Fi Sync settings endpoints (desktop Settings modal only) -----------
+# These expose/modify the pairing token, so they are locked to localhost —
+# the LAN-facing token auth is NOT enough here.
+
+_sync_config_at_launch = load_sync_config()  # binding state gui.py used at startup
+
+def _localhost_only(request: Request):
+    client_host = request.client.host if request.client else ""
+    if client_host not in ("127.0.0.1", "::1"):
+        raise HTTPException(status_code=403, detail="Settings are only accessible from the desktop app")
+
+def _lan_ips() -> list:
+    ips = []
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ips.append(s.getsockname()[0])
+        s.close()
+    except OSError:
+        pass
+    return ips
+
+class SyncConfigRequest(BaseModel):
+    enabled: bool
+    port: int = 8765
+
+def _sync_config_response(cfg: dict) -> dict:
+    restart_required = (
+        bool(cfg.get("enabled")) != bool(_sync_config_at_launch.get("enabled"))
+        or int(cfg.get("port", 8765)) != int(_sync_config_at_launch.get("port", 8765))
+    )
+    return {
+        "enabled": bool(cfg.get("enabled")),
+        "port": int(cfg.get("port", 8765)),
+        "token": cfg.get("token", ""),
+        "lan_ips": _lan_ips(),
+        "restart_required": restart_required,
+    }
+
+@app.get("/api/sync/config")
+async def get_sync_config(request: Request):
+    _localhost_only(request)
+    return _sync_config_response(load_sync_config())
+
+@app.post("/api/sync/config")
+async def set_sync_config(req: SyncConfigRequest, request: Request):
+    _localhost_only(request)
+    if not (1024 <= req.port <= 65535):
+        raise HTTPException(status_code=400, detail="Port must be between 1024 and 65535")
+    with sync_config_lock:
+        cfg = {"enabled": False, "port": 8765}
+        if os.path.exists(SYNC_CONFIG_FILE):
+            try:
+                with open(SYNC_CONFIG_FILE, "r", encoding="utf-8") as f:
+                    cfg.update(json.load(f))
+            except Exception:
+                pass
+        cfg["enabled"] = req.enabled
+        cfg["port"] = req.port
+        if not cfg.get("token"):
+            cfg["token"] = secrets.token_hex(16)
+        with open(SYNC_CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+    return _sync_config_response(cfg)
+
+@app.post("/api/sync/rotate-token")
+async def rotate_sync_token(request: Request):
+    _localhost_only(request)
+    with sync_config_lock:
+        cfg = {"enabled": False, "port": 8765}
+        if os.path.exists(SYNC_CONFIG_FILE):
+            try:
+                with open(SYNC_CONFIG_FILE, "r", encoding="utf-8") as f:
+                    cfg.update(json.load(f))
+            except Exception:
+                pass
+        cfg["token"] = secrets.token_hex(16)
+        with open(SYNC_CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+    return _sync_config_response(cfg)
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
