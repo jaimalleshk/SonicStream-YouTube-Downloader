@@ -77,9 +77,11 @@ def sanitize_filename(filename: str) -> str:
 
 def check_local_duplicate(title: str, format_type: str, download_dir: str) -> Optional[str]:
     target_exts = [".mp3"] if format_type == "audio" else [".mp4", ".mkv", ".webm"]
-    # Prepare sanitized base name using yt-dlp rules
-    ydl = yt_dlp.YoutubeDL({'outtmpl': '%(title)s'})
-    sanitized_title = ydl.prepare_filename({'title': title})
+    # Pure-python sanitization matching Windows rules
+    sanitized_title = title
+    for char in ['\\', '/', ':', '*', '?', '"', '<', '>', '|']:
+        sanitized_title = sanitized_title.replace(char, '_')
+    sanitized_title = sanitized_title.rstrip('. ')
     
     try:
         if os.path.exists(download_dir):
@@ -356,6 +358,12 @@ def worker_loop():
             run_download_job(job)
         except Exception as e:
             print(f"Error in queue worker: {e}")
+            with queue_lock:
+                queue_state["active_job"] = None
+            with progress_lock:
+                download_state["status"] = "failed"
+                download_state["error_message"] = str(e)
+                download_state["logs"].append(f"Fatal worker error: {str(e)}")
         finally:
             download_queue.task_done()
 
@@ -447,7 +455,7 @@ async def get_progress_stream():
             }
             yield f"data: {json.dumps(payload)}\n\n"
             
-            if status in ["completed", "failed", "idle"] and last_status == status:
+            if status in ["completed", "failed"] and last_status == status:
                 # Instead of shutting down the stream permanently, we break when the current active job finishes.
                 # The client will reconnect when a new active job starts.
                 break
