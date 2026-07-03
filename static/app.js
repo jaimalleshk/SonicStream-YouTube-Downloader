@@ -273,8 +273,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const playlistTitleVal = playlistTitle.textContent;
         const playlistUrlVal = urlInput.value.trim();
 
-        // Slide open the non-blocking Queue drawer
+        // Slide open the non-blocking Queue drawer and shift layout
         queueDrawer.classList.remove("hidden");
+        document.body.classList.add("queue-open");
 
         try {
             const res = await fetch("/api/download", {
@@ -307,6 +308,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Queue Drawer Management
     toggleQueueBtn.addEventListener("click", () => {
         queueDrawer.classList.toggle("hidden");
+        document.body.classList.toggle("queue-open", !queueDrawer.classList.contains("hidden"));
         if (!queueDrawer.classList.contains("hidden")) {
             updateQueueState();
         }
@@ -314,6 +316,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     closeDrawerBtn.addEventListener("click", () => {
         queueDrawer.classList.add("hidden");
+        document.body.classList.remove("queue-open");
     });
 
     async function updateQueueState() {

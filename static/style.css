@@ -33,6 +33,7 @@ body {
     position: relative;
     display: flex;
     justify-content: center;
+    transition: padding-right 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 /* Background Effects */
@@ -917,5 +918,13 @@ input[type="checkbox"]:checked::before {
     padding: 0.1rem 0.4rem;
     border-radius: 4px;
 }
+
+/* Responsive layout shift when queue drawer is active */
+@media (min-width: 1200px) {
+    body.queue-open {
+        padding-right: 400px;
+    }
+}
+
 
 
