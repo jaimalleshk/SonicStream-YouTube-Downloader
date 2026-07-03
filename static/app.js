@@ -513,6 +513,12 @@ document.addEventListener("DOMContentLoaded", () => {
             card.className = "history-card";
             
             const dateStr = new Date(item.timestamp).toLocaleString();
+            const showResume = item.completed_tracks < item.total_tracks;
+            const resumeBtnHtml = showResume ? `
+                <button class="btn btn-primary btn-sm resume-history-btn" data-id="${item.id}" style="background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple)); border: none;">
+                    Resume
+                </button>
+            ` : '';
             
             card.innerHTML = `
                 <div class="history-info">
@@ -523,11 +529,14 @@ document.addEventListener("DOMContentLoaded", () => {
                         <span class="h-time">${dateStr}</span>
                     </div>
                 </div>
-                <div class="history-status-container">
+                <div class="history-status-container" style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
                     <span class="history-progress-text">${item.completed_tracks} / ${item.total_tracks} tracks</span>
-                    <button class="btn btn-secondary btn-sm re-analyze-history-btn" data-url="${item.url}">
-                        Re-analyze
-                    </button>
+                    <div style="display: flex; gap: 0.4rem;">
+                        ${resumeBtnHtml}
+                        <button class="btn btn-secondary btn-sm re-analyze-history-btn" data-url="${item.url}">
+                            Re-analyze
+                        </button>
+                    </div>
                 </div>
             `;
             
@@ -537,6 +546,35 @@ document.addEventListener("DOMContentLoaded", () => {
                 historyModal.classList.add("hidden");
                 analyzeLink();
             });
+
+            if (showResume) {
+                card.querySelector(".resume-history-btn").addEventListener("click", async (e) => {
+                    const jobId = e.target.getAttribute("data-id");
+                    e.target.disabled = true;
+                    e.target.textContent = "Queueing...";
+                    try {
+                        const res = await fetch("/api/history/resume", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ job_id: jobId })
+                        });
+                        if (res.ok) {
+                            historyModal.classList.add("hidden");
+                            queueDrawer.classList.remove("hidden");
+                            updateQueueState();
+                        } else {
+                            const err = await res.json();
+                            alert(`Failed to resume job: ${err.detail}`);
+                            e.target.disabled = false;
+                            e.target.textContent = "Resume";
+                        }
+                    } catch (err) {
+                        alert(`Error: ${err.message}`);
+                        e.target.disabled = false;
+                        e.target.textContent = "Resume";
+                    }
+                });
+            }
             
             historyList.appendChild(card);
         });

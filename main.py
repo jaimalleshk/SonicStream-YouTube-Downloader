@@ -298,18 +298,34 @@ def run_download_job(job_data: dict):
                 }
             ]
 
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([item.url])
+        max_retries = 3
+        success = False
+        error_msg = ""
+        
+        for attempt in range(max_retries):
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([item.url])
+                success = True
+                break
+            except Exception as e:
+                error_msg = str(e)
+                if attempt < max_retries - 1:
+                    with progress_lock:
+                        download_state["logs"].append(
+                            f"[Retry Attempt {attempt + 2}/{max_retries}] for: {item.title} (Reason: {error_msg})"
+                        )
+                    time.sleep(2)
+        
+        if success:
             completed_count += 1
             update_history_item(job_id, completed_count)
-        except Exception as e:
-            error_str = f"Error downloading {item.title}: {str(e)}"
+        else:
+            error_str = f"Error downloading {item.title} after {max_retries} attempts: {error_msg}"
             with progress_lock:
                 download_state["logs"].append(error_str)
             completed_count += 1
             update_history_item(job_id, completed_count)
-            continue
 
     with progress_lock:
         download_state["status"] = "completed"
@@ -435,6 +451,105 @@ async def clear_history():
     with history_lock:
         save_history([])
     return {"message": "History cleared"}
+
+class ResumeRequest(BaseModel):
+    job_id: str
+
+@app.post("/api/history/resume")
+async def resume_job(req: ResumeRequest):
+    # 1. Find the history job
+    with history_lock:
+        history = load_history()
+    
+    job = None
+    for item in history:
+        if item.get("id") == req.job_id:
+            job = item
+            break
+            
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found in history")
+        
+    url = job.get("url")
+    if not url:
+        raise HTTPException(status_code=400, detail="Job does not have a URL associated")
+
+    # 2. Extract playlist entries
+    ydl_opts = {
+        'extract_flat': True,
+        'skip_download': True,
+        'quiet': True,
+        'no_warnings': True,
+    }
+    
+    try:
+        loop = asyncio.get_event_loop()
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = await loop.run_in_executor(None, lambda: ydl.extract_info(url, download=False))
+            
+        if not info:
+            raise HTTPException(status_code=400, detail="Could not retrieve video information for resumption")
+            
+        entries = []
+        is_playlist = info.get('_type') == 'playlist'
+        
+        raw_items = info.get('entries', []) if is_playlist else [info]
+        for entry in raw_items:
+            if not entry:
+                continue
+            video_id = entry.get('id') or entry.get('url')
+            if not video_id:
+                continue
+            entries.append(DownloadItem(
+                id=video_id,
+                title=entry.get('title') or "Unknown Title",
+                url=f"https://www.youtube.com/watch?v={video_id}" if is_playlist else url
+            ))
+            
+        # 3. Create the DownloadRequest
+        dl_req = DownloadRequest(
+            items=entries,
+            format=job.get("format", "audio"),
+            quality=job.get("quality", "highest"),
+            playlist_title=job.get("title"),
+            playlist_url=url,
+            skip_duplicates=True
+        )
+        
+        # 4. Trigger download (push to queue)
+        job_id = f"job_{int(time.time())}"
+        
+        # Insert a new entry so they see the resumption attempt history
+        new_entry = {
+            "id": job_id,
+            "title": f"[Resumed] {job.get('title')}",
+            "url": url,
+            "timestamp": datetime.now().isoformat(),
+            "total_tracks": len(entries),
+            "completed_tracks": 0,
+            "format": job.get("format", "audio"),
+            "quality": job.get("quality", "highest")
+        }
+        
+        with history_lock:
+            history = load_history()
+            history.insert(0, new_entry)
+            save_history(history)
+            
+        job_data = {
+            "job_id": job_id,
+            "title": f"[Resumed] {job.get('title')}",
+            "request": dl_req
+        }
+        
+        with queue_lock:
+            queue_state["pending_jobs"].append(job_data)
+            
+        download_queue.put(job_data)
+        return {"message": "Job resumed and queued", "job_id": job_id}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Resumption failed: {str(e)}")
 
 @app.post("/api/open-folder")
 async def open_folder():
