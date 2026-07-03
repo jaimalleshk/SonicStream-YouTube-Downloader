@@ -1030,5 +1030,12 @@ input[type="checkbox"]:checked::before {
     background: rgba(39, 201, 63, 0.03) !important;
 }
 
+/* Header Browse button hover style */
+#browseDirBtn:hover {
+    background: rgba(255, 255, 255, 0.15) !important;
+    border-color: var(--neon-blue) !important;
+    color: var(--neon-blue) !important;
+}
+
 
 

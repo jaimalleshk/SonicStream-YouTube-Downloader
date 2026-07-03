@@ -32,7 +32,16 @@
                 <span class="logo-text">SonicStream</span>
                 <span class="logo-badge">MVP</span>
             </div>
-            <div class="header-actions" style="display: flex; gap: 0.5rem;">
+            <div class="header-actions" style="display: flex; align-items: center; gap: 0.75rem;">
+                <!-- Download Directory Inline Selector -->
+                <div class="header-directory-selector" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); padding: 0.35rem 0.75rem; border-radius: 8px;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="flex-shrink: 0;">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <input type="text" id="downloadDirInput" style="background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 0.8rem; width: 230px; font-family: var(--font-sans); padding: 0;" placeholder="Loading path..." title="Download Location Path">
+                    <button id="browseDirBtn" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: var(--transition);">Browse</button>
+                </div>
+
                 <button class="btn btn-secondary open-folder-btn" id="historyBtn">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10"/>
@@ -132,16 +141,6 @@
                             <span class="q-detail" id="qAudioHighest">320 kbps</span>
                             <span class="q-detail-vid hidden" id="qVideoHighest">1080p / Best</span>
                         </label>
-                    </div>
-                </div>
-
-                <!-- Download Directory Panel -->
-                <div class="card config-card" style="margin-top: 1.25rem;">
-                    <h2>Download Directory</h2>
-                    <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
-                        <input type="text" id="downloadDirInput" style="flex-grow: 1; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); padding: 0.65rem 0.95rem; border-radius: 8px; color: var(--text-primary); font-size: 0.85rem;" placeholder="Loading path...">
-                        <button class="btn btn-secondary" id="browseDirBtn" style="padding: 0 1rem; font-size: 0.85rem; font-weight: 600;">Browse</button>
-                    </div>
                 </div>
             </section>
 
