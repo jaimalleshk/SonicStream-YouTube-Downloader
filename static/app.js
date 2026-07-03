@@ -1,68 +1,93 @@
 document.addEventListener("DOMContentLoaded", () => {
-    // DOM Elements
+    // DOM Elements - Settings & Search
     const urlInput = document.getElementById("urlInput");
     const analyzeBtn = document.getElementById("analyzeBtn");
     const analyzeSpinner = document.getElementById("analyzeSpinner");
     const urlError = document.getElementById("urlError");
-    
-    const playlistSection = document.getElementById("playlistSection");
+    const downloadDirInput = document.getElementById("downloadDirInput");
+    const browseDirBtn = document.getElementById("browseDirBtn");
+    const openFolderBtn = document.getElementById("openFolderBtn");
+
+    // DOM Elements - Left Sidebar Playlist Explorer
+    const tabPinned = document.getElementById("tabPinned");
+    const tabAll = document.getElementById("tabAll");
+    const tabTrash = document.getElementById("tabTrash");
+    const playlistListContainer = document.getElementById("playlistListContainer");
+    const sidebarPrevBtn = document.getElementById("sidebarPrevBtn");
+    const sidebarPageInfo = document.getElementById("sidebarPageInfo");
+    const sidebarNextBtn = document.getElementById("sidebarNextBtn");
+    const btnCreateManual = document.getElementById("btnCreateManual");
+
+    // DOM Elements - Right Playlist Items Grid
     const playlistTitle = document.getElementById("playlistTitle");
-    const playlistMeta = document.getElementById("playlistMeta");
+    const playlistMetaInfo = document.getElementById("playlistMetaInfo");
+    const refreshPlaylistBtn = document.getElementById("refreshPlaylistBtn");
+    const selectAllBtn = document.getElementById("selectAllBtn");
+    const deselectAllBtn = document.getElementById("deselectAllBtn");
+    const downloadBtn = document.getElementById("downloadBtn");
     const playlistSearch = document.getElementById("playlistSearch");
     const statusFilter = document.getElementById("statusFilter");
     const playlistTableBody = document.getElementById("playlistTableBody");
     const headerCheckbox = document.getElementById("headerCheckbox");
-    
-    const selectAllBtn = document.getElementById("selectAllBtn");
-    const deselectAllBtn = document.getElementById("deselectAllBtn");
-    const downloadBtn = document.getElementById("downloadBtn");
-    const skipDuplicatesCheckbox = document.getElementById("skipDuplicatesCheckbox");
-    
+    const btnPrevPage = document.getElementById("btnPrevPage");
+    const btnNextPage = document.getElementById("btnNextPage");
+    const pageIndicator = document.getElementById("pageIndicator");
+
+    // DOM Elements - Universal Media Player Controls
+    const playerVideo = document.getElementById("playerVideo");
+    const playerAudioArtPanel = document.getElementById("playerAudioArtPanel");
+    const playerTrackThumb = document.getElementById("playerTrackThumb");
+    const playerTrackTitle = document.getElementById("playerTrackTitle");
+    const playerTrackArtist = document.getElementById("playerTrackArtist");
+    const playerTrackStatus = document.getElementById("playerTrackStatus");
+    const playerCurrentTime = document.getElementById("playerCurrentTime");
+    const playerProgressBar = document.getElementById("playerProgressBar");
+    const playerTotalTime = document.getElementById("playerTotalTime");
+    const playerPlayPauseBtn = document.getElementById("playerPlayPauseBtn");
+    const playerPrevBtn = document.getElementById("playerPrevBtn");
+    const playerNextBtn = document.getElementById("playerNextBtn");
+    const playerShuffleBtn = document.getElementById("playerShuffleBtn");
+    const playerRepeatBtn = document.getElementById("playerRepeatBtn");
+    const playerVolumeBtn = document.getElementById("playerVolumeBtn");
+    const playerVolumeSlider = document.getElementById("playerVolumeSlider");
+    const playerMaximizeBtn = document.getElementById("playerMaximizeBtn");
+
+    // HUD and Terminal Console
     const gridHud = document.getElementById("gridHud");
     const hudJobTitle = document.getElementById("hudJobTitle");
     const hudSpeed = document.getElementById("hudSpeed");
     const hudEta = document.getElementById("hudEta");
     const hudProgressCount = document.getElementById("hudProgressCount");
     const consoleLogs = document.getElementById("consoleLogs");
-    
-    const openFolderBtn = document.getElementById("openFolderBtn");
 
-    // Download Folder selector elements
-    const downloadDirInput = document.getElementById("downloadDirInput");
-    const browseDirBtn = document.getElementById("browseDirBtn");
-
-    // History elements
-    const historyBtn = document.getElementById("historyBtn");
-    const historyModal = document.getElementById("historyModal");
-    const closeHistoryModalBtn = document.getElementById("closeHistoryModalBtn");
-    const clearHistoryBtn = document.getElementById("clearHistoryBtn");
-    const historyTableBody = document.getElementById("historyTableBody");
-    const historySearch = document.getElementById("historySearch");
-    const historyTypeFilter = document.getElementById("historyTypeFilter");
-
-    // Pagination elements
-    const btnFirstPage = document.getElementById("btnFirstPage");
-    const btnPrevPage = document.getElementById("btnPrevPage");
-    const btnNextPage = document.getElementById("btnNextPage");
-    const btnLastPage = document.getElementById("btnLastPage");
-    const pageIndicator = document.getElementById("pageIndicator");
-    const paginationRange = document.getElementById("paginationRange");
-    const paginationTotal = document.getElementById("paginationTotal");
-
-    // Global Caches for Interactive Grid Sorting & Live Sync
+    // State Variables
+    let historyJobs = [];
+    let currentPlaylistId = null;
     let playlistItems = [];
-    let localItemStates = {}; // Map of item.id -> { job_num, status, percentage, speed, start_time, end_time, error_detail }
-    let selectedItemIds = new Set(); // Global selection state model across pagination pages!
+    let localItemStates = {}; // Map of item.id -> { status, percentage, speed, start_time, end_time, error_detail }
+    let selectedItemIds = new Set();
+    
+    // Playback state variables
+    let playQueue = [];
+    let currentTrackIndex = -1;
+    let isPlaying = false;
+    let isShuffle = false;
+    let isRepeat = false;
+    let isMuted = false;
+    let lastVolume = 80;
+    let isMaximized = false;
     let currentEventSource = null;
-    let currentSortCol = null;
-    let sortAsc = true;
-    let historyItemsCache = []; // Global history log cache for search filtering
+    let nextTrackTimeout = null;
+    let nextTrackCountdownInterval = null;
 
-    // Pagination State
+    // Sidebar & Items Pagination
+    let sidebarTab = "all"; // Pinned, All, or Trash
+    let sidebarPage = 1;
+    const sidebarPageSize = 5;
     let currentPage = 1;
     const pageSize = 50;
 
-    // Helper: format duration in seconds to MM:SS or H:MM:SS
+    // Helper: format duration
     function formatDuration(seconds) {
         if (!seconds) return "--:--";
         const hrs = Math.floor(seconds / 3600);
@@ -74,253 +99,578 @@ document.addEventListener("DOMContentLoaded", () => {
         return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
 
-    // Format Pill change listeners
-    const formatRadios = document.querySelectorAll('input[name="format"]');
-    formatRadios.forEach(radio => {
-        radio.addEventListener("change", (e) => {
-            document.querySelectorAll('input[name="format"]').forEach(r => {
-                r.closest(".header-pill-btn")?.classList.remove("active");
-            });
-            if (e.target.checked) {
-                e.target.closest(".header-pill-btn")?.classList.add("active");
-            }
-            updateActiveQualityLabel();
-        });
-    });
-
-    // Quality Pill change listeners
-    const qualityRadios = document.querySelectorAll('input[name="quality"]');
-    qualityRadios.forEach(radio => {
-        radio.addEventListener("change", (e) => {
-            document.querySelectorAll('input[name="quality"]').forEach(r => {
-                r.closest(".header-pill-btn")?.classList.remove("active");
-            });
-            if (e.target.checked) {
-                e.target.closest(".header-pill-btn")?.classList.add("active");
-            }
-            updateActiveQualityLabel();
-        });
-    });
-
-    // Ensure label click toggles radio
-    document.querySelectorAll(".header-pill-btn").forEach(btn => {
-        btn.addEventListener("click", (e) => {
-            const radio = btn.querySelector('input[type="radio"]');
-            if (radio && e.target !== radio && !radio.checked) {
-                radio.checked = true;
-                radio.dispatchEvent(new Event("change"));
-            }
-        });
-    });
-
-    function updateActiveQualityLabel() {
-        const format = document.querySelector('input[name="format"]:checked')?.value || "audio";
-        const quality = document.querySelector('input[name="quality"]:checked')?.value || "high";
-        
-        const formatText = format === "audio" ? "Audio (.mp3)" : "Video (.mp4)";
-        
-        let qualityText = "High";
-        if (format === "audio") {
-            const map = { low: "Low (64 kbps)", medium: "Medium (128 kbps)", high: "High (192 kbps)", highest: "Highest (320 kbps)" };
-            qualityText = map[quality] || "High (192 kbps)";
-        } else {
-            const map = { low: "Low (360p)", medium: "Medium (480p)", high: "High (720p)", highest: "Highest (1080p)" };
-            qualityText = map[quality] || "High (720p)";
-        }
-        
-        const formatTextEl = document.getElementById("activeFormatText");
-        const qualityTextEl = document.getElementById("activeQualityText");
-        if (formatTextEl) formatTextEl.textContent = formatText;
-        if (qualityTextEl) qualityTextEl.textContent = qualityText;
-
-        // Dynamic size calculations based on selection formatting
-        updateSelectionMeta();
+    // Helper: show/hide errors
+    function showError(msg) {
+        urlError.textContent = msg;
+        urlError.classList.remove("hidden");
+    }
+    function hideError() {
+        urlError.classList.add("hidden");
     }
 
-    // Load initial default directory path
-    async function loadDefaultDir() {
+    // Terminal Logging
+    function logToTerminal(msg, isError = false) {
+        const p = document.createElement("p");
+        p.textContent = msg;
+        if (isError) {
+            p.style.color = "var(--error)";
+        }
+        consoleLogs.appendChild(p);
+        consoleLogs.scrollTop = consoleLogs.scrollHeight;
+    }
+
+    // Load jobs history and populate left sidebar explorer
+    async function loadSidebar() {
         try {
-            const res = await fetch("/api/settings/dir");
-            const data = await res.json();
-            if (data.download_dir) {
-                downloadDirInput.value = data.download_dir;
-                syncSavingToLabel();
+            const res = await fetch("/api/history");
+            historyJobs = await res.json();
+            
+            // Auto select first active playlist if none active
+            if (historyJobs.length > 0 && !currentPlaylistId) {
+                const active = historyJobs.find(job => !job.deleted);
+                if (active) selectPlaylist(active);
             }
+            
+            renderSidebarList();
         } catch (e) {
-            console.error("Error loading default directory:", e);
-        }
-    }
-    loadDefaultDir();
-
-    // Directory selector browse dialog mapping
-    browseDirBtn.addEventListener("click", async () => {
-        browseDirBtn.disabled = true;
-        const oldText = browseDirBtn.textContent;
-        browseDirBtn.textContent = "Browsing...";
-        try {
-            const res = await fetch("/api/settings/browse", { method: "POST" });
-            const data = await res.json();
-            if (data.download_dir) {
-                downloadDirInput.value = data.download_dir;
-                syncSavingToLabel();
-            }
-        } catch (e) {
-            alert(`Failed to select folder: ${e.message}`);
-        } finally {
-            browseDirBtn.disabled = false;
-            browseDirBtn.textContent = oldText;
-        }
-    });
-
-    // Manual typing directory listener
-    downloadDirInput.addEventListener("input", syncSavingToLabel);
-
-    function syncSavingToLabel() {
-        const path = downloadDirInput.value.trim() || "--";
-        const lbl = document.getElementById("lblSavingTo");
-        if (lbl) {
-            lbl.textContent = `Saving to: ${path}`;
-            lbl.title = path; // Tooltip shows full path
+            console.error("Failed to load history list:", e);
         }
     }
 
-    // Analyze link
-    analyzeBtn.addEventListener("click", analyzeLink);
-    urlInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-            analyzeLink();
-        }
-    });
-
-    async function analyzeLink() {
-        const url = urlInput.value.trim();
-        if (!url) {
-            showError("Please enter a valid YouTube video or playlist URL");
-            return;
-        }
-
-        // Reset UI
-        hideError();
-        analyzeSpinner.classList.remove("hidden");
-        analyzeBtn.disabled = true;
-        playlistSection.classList.add("hidden");
-        playlistItems = [];
-        localItemStates = {};
-        selectedItemIds.clear();
-        currentPage = 1;
-
+    // Fallback fetching helper for older history items without pre-extracted tracks
+    async function fetchPlaylistTracksFallback(job) {
         try {
-            const response = await fetch("/api/fetch-info", {
+            const res = await fetch("/api/fetch-info", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url })
+                body: JSON.stringify({ url: job.url })
             });
-
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.detail || "Failed to parse YouTube link");
-            }
-
-            playlistItems = data.entries;
-            playlistTitle.textContent = data.title;
-            
-            // Initialize local states cache and select all by default
-            playlistItems.forEach(item => {
-                localItemStates[item.id] = {
-                    job_num: "--",
+            if (res.ok) {
+                const data = await res.json();
+                const fetchedItems = data.entries || [];
+                
+                // Save to backend
+                await fetch(`/api/history/${job.id}/items`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ items: fetchedItems })
+                });
+                
+                // Update local job object
+                job.items = fetchedItems.map(item => ({
+                    id: item.id,
+                    title: item.title,
+                    uploader: item.uploader || "Unknown",
+                    duration: item.duration || 0,
+                    thumbnail: item.thumbnail,
+                    url: item.url,
                     status: "queued",
                     percentage: 0.0,
                     speed: "--",
                     start_time: "--",
                     end_time: "--",
                     error_detail: ""
-                };
-                selectedItemIds.add(item.id);
+                }));
+                job.total_tracks = fetchedItems.length;
+                return job.items;
+            }
+        } catch (e) {
+            console.error("Failed fallback fetch:", e);
+        }
+        return [];
+    }
+
+    function renderSidebarList() {
+        playlistListContainer.innerHTML = "";
+        
+        let filtered = [];
+        if (sidebarTab === "pinned") {
+            filtered = historyJobs.filter(job => job.pinned && !job.deleted && job.id !== "deleted_tracks");
+        } else if (sidebarTab === "all") {
+            // Show all downloads virtual entry at index 0, followed by non-deleted items
+            filtered = historyJobs.filter(job => !job.deleted && job.id !== "deleted_tracks");
+        } else if (sidebarTab === "trash") {
+            // Show deleted tracks virtual entry at index 0, followed by deleted items
+            const trashPlaylists = historyJobs.filter(job => job.deleted);
+            const deletedTracks = historyJobs.find(job => job.id === "deleted_tracks");
+            filtered = deletedTracks ? [deletedTracks].concat(trashPlaylists) : trashPlaylists;
+        }
+        
+        // Pagination logic
+        const total = filtered.length;
+        const totalPages = Math.max(1, Math.ceil(total / sidebarPageSize));
+        if (sidebarPage > totalPages) sidebarPage = totalPages;
+        if (sidebarPage < 1) sidebarPage = 1;
+        
+        const start = (sidebarPage - 1) * sidebarPageSize;
+        const end = Math.min(start + sidebarPageSize, total);
+        const pageItems = filtered.slice(start, end);
+        
+        sidebarPageInfo.textContent = `Page ${sidebarPage} of ${totalPages}`;
+        sidebarPrevBtn.disabled = sidebarPage <= 1;
+        sidebarNextBtn.disabled = sidebarPage >= totalPages;
+        
+        if (pageItems.length === 0) {
+            playlistListContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.75rem; padding: 1.5rem 0;">No playlists found.</div>`;
+            return;
+        }
+        
+        pageItems.forEach(job => {
+            const row = document.createElement("div");
+            row.className = `sidebar-row ${currentPlaylistId === job.id ? 'active' : ''}`;
+            
+            const totalTracks = job.total_tracks || 0;
+            const completed = job.success_count || 0;
+            const percent = totalTracks > 0 ? Math.round((completed / totalTracks) * 100) : 0;
+            const isPinned = job.pinned || false;
+            const isVirtual = job.is_virtual || false;
+            
+            if (sidebarTab === "trash") {
+                // Trash Tab controls (Restore / Delete permanently)
+                row.innerHTML = `
+                    <div class="sidebar-row-header">
+                        <div class="sidebar-row-title" title="${job.title}">${job.title}</div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.25rem;">
+                        <span style="font-size: 0.65rem; color: var(--text-muted);">${totalTracks} tracks</span>
+                        <div class="sidebar-row-controls" style="display: flex; gap: 0.5rem; align-items: center;">
+                            ${job.id !== "deleted_tracks" ? `
+                            <button class="sidebar-row-btn restore-sidebar-btn" title="Restore Playlist">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><polyline points="3 3 3 8 8 8"/></svg>
+                            </button>
+                            ` : ''}
+                            <button class="sidebar-row-btn perm-delete-sidebar-btn" title="Delete Permanently" style="color: var(--error);">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                row.addEventListener("click", (e) => {
+                    if (e.target.closest("button")) return;
+                    selectPlaylist(job);
+                });
+                
+                if (job.id !== "deleted_tracks") {
+                    row.querySelector(".restore-sidebar-btn").addEventListener("click", async (e) => {
+                        e.stopPropagation();
+                        try {
+                            const res = await fetch(`/api/history/${job.id}/restore`, { method: "POST" });
+                            if (res.ok) {
+                                logToTerminal(`[System] Restored playlist "${job.title}".`);
+                                await loadSidebar();
+                            }
+                        } catch (err) {
+                            console.error("Restore failed:", err);
+                        }
+                    });
+                }
+                
+                row.querySelector(".perm-delete-sidebar-btn").addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    const warning = job.id === "deleted_tracks" 
+                        ? "Are you sure you want to empty the deleted tracks list?" 
+                        : `Are you sure you want to delete "${job.title}" permanently? This cannot be undone.`;
+                    
+                    if (!confirm(warning)) return;
+                    
+                    try {
+                        const res = await fetch(`/api/history/${job.id}`, { method: "DELETE" });
+                        if (res.ok) {
+                            logToTerminal(`[System] Deleted "${job.title}" permanently.`);
+                            if (currentPlaylistId === job.id) {
+                                currentPlaylistId = null;
+                                playlistItems = [];
+                                playlistTitle.textContent = "No Playlist Selected";
+                                playlistMetaInfo.textContent = "Select a playlist from the left explorer.";
+                                playlistTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">No items active.</td></tr>`;
+                            }
+                            await loadSidebar();
+                        }
+                    } catch (err) {
+                        console.error("Permanent delete failed:", err);
+                    }
+                });
+                
+            } else {
+                // Active Tabs (Pinned or All)
+                row.innerHTML = `
+                    <div class="sidebar-row-header">
+                        <div class="sidebar-row-title" title="${job.title}">${job.title}</div>
+                        ${!isVirtual ? `<span style="font-size: 0.65rem; color: var(--text-muted); font-weight: bold; flex-shrink: 0;">${percent}%</span>` : ''}
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.25rem;">
+                        <span style="font-size: 0.65rem; color: var(--text-muted);">${completed}/${totalTracks} tracks</span>
+                        <div class="sidebar-row-controls" style="display: flex; gap: 0.5rem; align-items: center;">
+                            <button class="sidebar-row-btn play-sidebar-btn" title="Play Playlist">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            </button>
+                            <button class="sidebar-row-btn shuffle-sidebar-btn" title="Shuffle Play">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M4 20l17-17M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+                            </button>
+                            <button class="sidebar-row-btn resume-sidebar-btn" title="Resume Last Played">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+                            </button>
+                            ${!isVirtual ? `
+                            <button class="sidebar-row-btn pin-sidebar-btn ${isPinned ? 'pinned-active' : ''}" title="${isPinned ? 'Unpin' : 'Pin'}">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                            </button>
+                            <button class="sidebar-row-btn delete-sidebar-btn" title="Move to Trash" style="color: var(--error);">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                    ${!isVirtual ? `
+                    <div class="sidebar-row-progress-container" style="margin-top: 0.35rem;">
+                        <div class="sidebar-row-progress-bar" style="width: ${percent}%;"></div>
+                    </div>
+                    ` : ''}
+                `;
+                
+                row.addEventListener("click", (e) => {
+                    if (e.target.closest("button")) return;
+                    selectPlaylist(job);
+                });
+                
+                row.querySelector(".play-sidebar-btn").addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    await selectPlaylist(job);
+                    let tracks = playQueue.filter(t => isTrackDownloaded(t));
+                    if (tracks.length > 0) {
+                        playTrack(tracks[0], playQueue, playQueue.findIndex(t => t.id === tracks[0].id));
+                    } else {
+                        alert("No downloaded tracks found in this playlist to play.");
+                    }
+                });
+                
+                row.querySelector(".shuffle-sidebar-btn").addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    await selectPlaylist(job);
+                    let tracks = playQueue.filter(t => isTrackDownloaded(t));
+                    if (tracks.length > 0) {
+                        isShuffle = true;
+                        playerShuffleBtn.classList.add("active");
+                        const rand = Math.floor(Math.random() * tracks.length);
+                        const origIndex = playQueue.findIndex(t => t.id === tracks[rand].id);
+                        playTrack(tracks[rand], playQueue, origIndex);
+                    } else {
+                        alert("No downloaded tracks found in this playlist to shuffle.");
+                    }
+                });
+
+                row.querySelector(".resume-sidebar-btn").addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    await selectPlaylist(job);
+                    let tracks = playlistItems;
+                    
+                    if (tracks.length > 0) {
+                        const lastPlayedId = job.last_played_track_id;
+                        const lastPlayedShuffle = job.last_played_shuffle || false;
+                        const savedShuffleOrder = job.shuffle_order || [];
+                        const savedShuffleIndex = job.shuffle_index !== undefined ? job.shuffle_index : -1;
+                        
+                        let targetTrack = null;
+                        let targetQueue = tracks;
+                        let targetIndex = 0;
+                        
+                        if (lastPlayedId) {
+                            targetTrack = tracks.find(t => t.id === lastPlayedId);
+                        }
+                        if (!targetTrack || !isTrackDownloaded(targetTrack)) {
+                            const downloaded = tracks.filter(t => isTrackDownloaded(t));
+                            targetTrack = downloaded.length > 0 ? downloaded[0] : null;
+                        }
+                        
+                        if (!targetTrack) {
+                            alert("No downloaded tracks available in this playlist to resume.");
+                            return;
+                        }
+                        
+                        if (lastPlayedShuffle && savedShuffleOrder.length > 0) {
+                            isShuffle = true;
+                            playerShuffleBtn.classList.add("active");
+                            const orderedQueue = savedShuffleOrder.map(id => tracks.find(t => t.id === id)).filter(Boolean);
+                            if (orderedQueue.length > 0) {
+                                targetQueue = orderedQueue;
+                                targetIndex = savedShuffleIndex >= 0 ? savedShuffleIndex : targetQueue.findIndex(t => t.id === targetTrack.id);
+                            }
+                        } else {
+                            isShuffle = false;
+                            playerShuffleBtn.classList.remove("active");
+                            targetQueue = tracks;
+                            targetIndex = targetQueue.findIndex(t => t.id === targetTrack.id);
+                        }
+                        
+                        playTrack(targetTrack, targetQueue, targetIndex);
+                    }
+                });
+                
+                if (!isVirtual) {
+                    row.querySelector(".pin-sidebar-btn").addEventListener("click", async (e) => {
+                        e.stopPropagation();
+                        try {
+                            const res = await fetch(`/api/history/${job.id}/pin`, { method: "POST" });
+                            if (res.ok) {
+                                const data = await res.json();
+                                job.pinned = data.pinned;
+                                loadSidebar();
+                            }
+                        } catch (err) {
+                            console.error("Failed to pin job:", err);
+                        }
+                    });
+
+                    row.querySelector(".delete-sidebar-btn").addEventListener("click", async (e) => {
+                        e.stopPropagation();
+                        if (!confirm(`Are you sure you want to move "${job.title}" to the trash bin?`)) return;
+                        try {
+                            const res = await fetch(`/api/history/${job.id}`, { method: "DELETE" });
+                            if (res.ok) {
+                                logToTerminal(`[System] Soft-deleted "${job.title}". Moved to Trash.`);
+                                if (currentPlaylistId === job.id) {
+                                    currentPlaylistId = null;
+                                    playlistItems = [];
+                                    playlistTitle.textContent = "No Playlist Selected";
+                                    playlistMetaInfo.textContent = "Select a playlist from the left explorer.";
+                                    playlistTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">No items active.</td></tr>`;
+                                }
+                                await loadSidebar();
+                            }
+                        } catch (err) {
+                            console.error("Soft delete failed:", err);
+                        }
+                    });
+                }
+            }
+            
+            playlistListContainer.appendChild(row);
+        });
+    }
+
+    async function selectPlaylist(job) {
+        currentPlaylistId = job.id;
+        playlistTitle.textContent = job.title;
+        urlInput.value = job.url || "";
+        
+        localItemStates = {};
+        selectedItemIds.clear();
+        
+        if ((!job.items || job.items.length === 0) && job.url && !job.is_virtual) {
+            playlistMetaInfo.textContent = "Loading items from YouTube...";
+            playlistTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">Fetching track list...</td></tr>`;
+            
+            const fetched = await fetchPlaylistTracksFallback(job);
+            if (fetched && fetched.length > 0) {
+                playlistItems = fetched;
+            } else {
+                playlistItems = [];
+                playlistTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--error); padding: 2rem;">Failed to fetch tracks.</td></tr>`;
+                playlistMetaInfo.textContent = "Fetch failed.";
+                return;
+            }
+        } else {
+            playlistItems = job.items || [];
+        }
+        
+        playlistMetaInfo.textContent = `${job.total_tracks} tracks | format: ${job.format || "audio"} | quality: ${job.quality || "highest"}`;
+        
+        playlistItems.forEach(item => {
+            localItemStates[item.id] = {
+                status: item.status || "queued",
+                percentage: item.percentage || 0.0,
+                speed: item.speed || "--",
+                start_time: item.start_time || "--",
+                end_time: item.end_time || "--",
+                error_detail: item.error_detail || ""
+            };
+            selectedItemIds.add(item.id);
+        });
+        
+        playQueue = playlistItems;
+        currentTrackIndex = 0;
+        
+        currentPage = 1;
+        renderPlaylistTable(playlistItems);
+        updateSelectionMeta();
+        renderSidebarList();
+
+        // Auto-resume pending downloads (only for real, non-virtual playlists)
+        if (!job.is_virtual && job.url) {
+            const hasPending = playlistItems.some(item => {
+                const status = localItemStates[item.id].status;
+                return status === "queued" || status === "downloading" || status === "error" || status === "failed";
             });
-
-            renderPlaylistTable(playlistItems);
             
-            headerCheckbox.checked = true;
-            updateSelectionMeta();
-            
-            playlistSection.classList.remove("hidden");
-            playlistSection.scrollIntoView({ behavior: "smooth" });
-
-        } catch (err) {
-            showError(err.message);
-        } finally {
-            analyzeSpinner.classList.add("hidden");
-            analyzeBtn.disabled = false;
+            if (hasPending) {
+                logToTerminal(`[System] Auto-resuming pending downloads for "${job.title}"...`);
+                autoResumePlaylist(job.id);
+            }
         }
     }
 
+    async function autoResumePlaylist(jobId) {
+        try {
+            const res = await fetch("/api/history/resume", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ job_id: jobId, force_all: false })
+            });
+            if (res.ok) {
+                const resData = await res.json();
+                logToTerminal(`[System] Resumed pending queue successfully.`);
+                hudJobTitle.textContent = `Active Job: #${resData.job_num} - ${resData.title}`;
+                gridHud.classList.remove("hidden");
+                startProgressStream();
+            }
+        } catch (e) {
+            console.error("Auto-resume failed:", e);
+        }
+    }
+
+    // Paging listeners for explorer sidebar
+    sidebarPrevBtn.addEventListener("click", () => {
+        if (sidebarPage > 1) {
+            sidebarPage--;
+            renderSidebarList();
+        }
+    });
+    sidebarNextBtn.addEventListener("click", () => {
+        let count = 0;
+        if (sidebarTab === "pinned") count = historyJobs.filter(j => j.pinned && !j.deleted && j.id !== "deleted_tracks").length;
+        else if (sidebarTab === "all") count = historyJobs.filter(j => !j.deleted && j.id !== "deleted_tracks").length;
+        else if (sidebarTab === "trash") count = historyJobs.filter(j => j.deleted || j.id === "deleted_tracks").length;
+        
+        const totalPages = Math.ceil(count / sidebarPageSize);
+        if (sidebarPage < totalPages) {
+            sidebarPage++;
+            renderSidebarList();
+        }
+    });
+
+    // Sidebar tab selection
+    tabPinned.addEventListener("click", () => {
+        sidebarTab = "pinned";
+        tabPinned.classList.add("active");
+        tabAll.classList.remove("active");
+        tabTrash.classList.remove("active");
+        sidebarPage = 1;
+        renderSidebarList();
+    });
+    tabAll.addEventListener("click", () => {
+        sidebarTab = "all";
+        tabAll.classList.add("active");
+        tabPinned.classList.remove("active");
+        tabTrash.classList.remove("active");
+        sidebarPage = 1;
+        renderSidebarList();
+    });
+    tabTrash.addEventListener("click", () => {
+        sidebarTab = "trash";
+        tabTrash.classList.add("active");
+        tabPinned.classList.remove("active");
+        tabAll.classList.remove("active");
+        sidebarPage = 1;
+        renderSidebarList();
+    });
+
+    // Create Manual Playlist button handler
+    btnCreateManual.addEventListener("click", async () => {
+        const option = confirm("Click OK to Import files from folder, or Cancel to Create an Empty Playlist.");
+        if (option) {
+            // Import folder
+            try {
+                const browseRes = await fetch("/api/settings/browse-folder", { method: "POST" });
+                const browseData = await browseRes.json();
+                if (browseData.folder_path) {
+                    const title = prompt("Enter playlist title:");
+                    if (!title || !title.trim()) return;
+                    
+                    const res = await fetch("/api/playlists/import", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ title: title.trim(), folder_path: browseData.folder_path })
+                    });
+                    
+                    if (res.ok) {
+                        const newPlaylist = await res.json();
+                        logToTerminal(`[System] Imported local folder to playlist "${newPlaylist.title}".`);
+                        await loadSidebar();
+                        selectPlaylist(newPlaylist);
+                    } else {
+                        const errData = await res.json();
+                        alert(`Import failed: ${errData.detail}`);
+                    }
+                }
+            } catch (err) {
+                console.error("Browse folder failed:", err);
+            }
+        } else {
+            // Empty manual playlist
+            const title = prompt("Enter playlist title:");
+            if (!title || !title.trim()) return;
+            
+            try {
+                const res = await fetch("/api/playlists/create", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ title: title.trim() })
+                });
+                if (res.ok) {
+                    const newPlaylist = await res.json();
+                    logToTerminal(`[System] Created manual playlist "${newPlaylist.title}".`);
+                    await loadSidebar();
+                    selectPlaylist(newPlaylist);
+                }
+            } catch (err) {
+                console.error("Create manual playlist failed:", err);
+            }
+        }
+    });
+
+    // Sync/Refresh Playlist button handler
+    refreshPlaylistBtn.addEventListener("click", async () => {
+        if (!currentPlaylistId || currentPlaylistId === "all_downloads" || currentPlaylistId === "deleted_tracks") {
+            alert("Please select a real YouTube playlist to sync.");
+            return;
+        }
+        
+        refreshPlaylistBtn.disabled = true;
+        refreshPlaylistBtn.textContent = "Syncing...";
+        logToTerminal(`[System] Fetching latest playlist uploads from YouTube...`);
+        
+        try {
+            const res = await fetch(`/api/history/${currentPlaylistId}/refresh`, { method: "POST" });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.detail || "Refresh failed");
+            }
+            
+            const resData = await res.json();
+            if (resData.new_count > 0) {
+                logToTerminal(`[System] Sync completed! Found ${resData.new_count} new tracks.`);
+                hudJobTitle.textContent = `Active Job: #${resData.job_num} - Delta Sync`;
+                gridHud.classList.remove("hidden");
+                
+                await loadSidebar();
+                startProgressStream();
+            } else {
+                logToTerminal(`[System] Playlist is already up to date. No new uploads detected.`);
+                alert("Playlist is already up to date.");
+            }
+        } catch (err) {
+            logToTerminal(`[Error] Refresh failed: ${err.message}`, true);
+            alert(`Refresh failed: ${err.message}`);
+        } finally {
+            refreshPlaylistBtn.disabled = false;
+            refreshPlaylistBtn.textContent = "Sync YouTube";
+        }
+    });
+
+    // Render track rows in the Items Grid
     function renderPlaylistTable(items) {
         playlistTableBody.innerHTML = "";
         
-        // Sort items array: uncompleted items first, completed/skipped/error items last.
-        items.sort((a, b) => {
-            const stateA = localItemStates[a.id] || { status: "queued" };
-            const stateB = localItemStates[b.id] || { status: "queued" };
-            
-            const isDoneA = (stateA.status === "completed" || stateA.status === "skipped" || stateA.status === "error");
-            const isDoneB = (stateB.status === "completed" || stateB.status === "skipped" || stateB.status === "error");
-            
-            // Primary Sort: Active/Queued comes first, finished moves to bottom (last pages)
-            if (isDoneA !== isDoneB) {
-                return isDoneA ? 1 : -1;
-            }
-            
-            // Secondary Sort: header sort
-            if (currentSortCol) {
-                let valA = "";
-                let valB = "";
-                
-                if (currentSortCol === "title") {
-                    valA = a.title || "";
-                    valB = b.title || "";
-                } else if (currentSortCol === "uploader") {
-                    valA = a.uploader || "";
-                    valB = b.uploader || "";
-                } else if (currentSortCol === "duration") {
-                    valA = a.duration || 0;
-                    valB = b.duration || 0;
-                } else {
-                    if (currentSortCol === "job_num") {
-                        valA = stateA.job_num || 0;
-                        valB = stateB.job_num || 0;
-                    } else if (currentSortCol === "status") {
-                        valA = stateA.percentage || 0;
-                        valB = stateB.percentage || 0;
-                    } else if (currentSortCol === "speed") {
-                        valA = parseFloat(stateA.speed) || 0;
-                        valB = parseFloat(stateB.speed) || 0;
-                    } else if (currentSortCol === "start_time") {
-                        valA = stateA.start_time || "";
-                        valB = stateB.start_time || "";
-                    } else if (currentSortCol === "end_time") {
-                        valA = stateA.end_time || "";
-                        valB = stateB.end_time || "";
-                    } else if (currentSortCol === "status_detail") {
-                        valA = stateA.status || "";
-                        valB = stateB.status || "";
-                    } else if (currentSortCol === "error_detail") {
-                        valA = stateA.error_detail || "";
-                        valB = stateB.error_detail || "";
-                    }
-                }
-                
-                if (typeof valA === "string") {
-                    return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
-                } else {
-                    return sortAsc ? (valA - valB) : (valB - valA);
-                }
-            }
-            
-            // Tertiary Sort: default index order
-            return playlistItems.indexOf(a) - playlistItems.indexOf(b);
-        });
-
-        // Filter items
         const query = playlistSearch.value.toLowerCase().trim();
         const status = statusFilter.value;
         
@@ -331,71 +681,40 @@ document.addEventListener("DOMContentLoaded", () => {
             const itemStatus = state.status || "queued";
             
             const matchesText = title.includes(query) || channel.includes(query);
-            
-            let matchesStatus = false;
-            if (status === "all") {
-                matchesStatus = true;
-            } else if (status === "queued" && itemStatus === "queued") {
-                matchesStatus = true;
-            } else if (status === "downloading" && itemStatus === "downloading") {
-                matchesStatus = true;
-            } else if (status === "completed" && itemStatus === "completed") {
-                matchesStatus = true;
-            } else if (status === "skipped" && itemStatus === "skipped") {
-                matchesStatus = true;
-            } else if (status === "error" && itemStatus === "error") {
-                matchesStatus = true;
-            }
-            
+            const matchesStatus = (status === "all") || (itemStatus === status);
             return matchesText && matchesStatus;
         });
 
         const totalFiltered = filteredItems.length;
         const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
         
-        // Boundaries checks
-        if (currentPage > totalPages) {
-            currentPage = totalPages;
-        }
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
         
         const startIdx = (currentPage - 1) * pageSize;
         const endIdx = startIdx + pageSize;
         const pageItems = filteredItems.slice(startIdx, endIdx);
 
-        // Update Pagination Controls Info
         if (totalFiltered === 0) {
-            playlistTableBody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-muted); padding: 2rem;">No videos found matching current filter.</td></tr>`;
-            paginationRange.textContent = "0 - 0";
-            paginationTotal.textContent = "0";
+            playlistTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">No items active.</td></tr>`;
             pageIndicator.textContent = "Page 1 of 1";
-            btnFirstPage.disabled = true;
             btnPrevPage.disabled = true;
             btnNextPage.disabled = true;
-            btnLastPage.disabled = true;
             return;
         }
 
-        paginationRange.textContent = `${startIdx + 1} - ${Math.min(endIdx, totalFiltered)}`;
-        paginationTotal.textContent = totalFiltered;
         pageIndicator.textContent = `Page ${currentPage} of ${totalPages}`;
-        
-        btnFirstPage.disabled = currentPage === 1;
         btnPrevPage.disabled = currentPage === 1;
         btnNextPage.disabled = currentPage === totalPages;
-        btnLastPage.disabled = currentPage === totalPages;
 
-        // Sync header checkbox based on current page states
-        let allPageChecked = true;
-        if (pageItems.length === 0) allPageChecked = false;
+        let allChecked = true;
         pageItems.forEach(item => {
-            if (!selectedItemIds.has(item.id)) allPageChecked = false;
+            if (!selectedItemIds.has(item.id)) allChecked = false;
         });
-        headerCheckbox.checked = allPageChecked;
+        headerCheckbox.checked = allChecked && pageItems.length > 0;
 
-        // Render pageItems rows
-        pageItems.forEach(item => {
+        pageItems.forEach((item, idx) => {
             const state = localItemStates[item.id] || {
-                job_num: "--",
                 status: "queued",
                 percentage: 0.0,
                 speed: "--",
@@ -408,40 +727,71 @@ document.addEventListener("DOMContentLoaded", () => {
             row.className = "playlist-row";
             row.setAttribute("data-id", item.id);
             
-            const activeTitle = playlistTitle.textContent || "Download";
-            const jobDisplay = state.job_num !== "--" ? `#${state.job_num} - ${activeTitle}` : "--";
-            const speedDisplay = state.speed !== "0 KB/s" ? state.speed : "--";
-            
             const isPlayable = (state.status === "completed" || state.status === "skipped");
             if (isPlayable) {
                 row.classList.add("playable");
             }
-            const playIcon = isPlayable ? " ▶" : "";
             
             const isChecked = selectedItemIds.has(item.id);
+            const displayStatus = state.status === "skipped" ? "Downloaded" : state.status;
             
+            // Conditional action buttons rendering
+            let actionButtons = "";
+            if (currentPlaylistId === "deleted_tracks") {
+                // Restore / Permanent Delete for deleted tracks
+                actionButtons = `
+                    <button class="row-restore-btn" style="background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 2px;" title="Restore to Playlist">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><polyline points="3 3 3 8 8 8"/></svg>
+                    </button>
+                    <button class="row-perm-delete-btn" style="background: transparent; border: none; color: var(--error); cursor: pointer; padding: 2px;" title="Delete Permanently">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                    </button>
+                `;
+            } else {
+                // Play controls + Playlist management tools
+                actionButtons = `
+                    <button class="row-play-btn" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px;" title="Play Track">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    </button>
+                    <button class="row-play-from-here-btn" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px;" title="Play From Here">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+                    </button>
+                    <button class="row-add-playlist-btn" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px;" title="Add to Playlist">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                    ${currentPlaylistId !== "all_downloads" ? `
+                    <button class="row-delete-btn" style="background: transparent; border: none; color: var(--error); cursor: pointer; padding: 2px;" title="Remove from Playlist">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                    ` : ''}
+                `;
+            }
+
             row.innerHTML = `
                 <td><input type="checkbox" class="video-checkbox" ${isChecked ? 'checked' : ''} data-id="${item.id}"></td>
-                <td class="thumb-cell"><img src="${item.thumbnail || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=120'}" alt="Thumb"></td>
-                <td class="title-cell" title="${item.title}">${item.title}</td>
-                <td class="channel-cell">${item.uploader}</td>
-                <td class="duration-cell">${formatDuration(item.duration)}</td>
-                <td class="job-cell" id="job-${item.id}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;" title="${jobDisplay}">${jobDisplay}</td>
-                <td class="status-cell" id="status-col-${item.id}">
-                    <div class="cell-progress-container">
-                        <span id="percent-val-${item.id}" style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono);">${state.percentage}%</span>
-                        <div class="cell-progress-bar">
-                            <div class="cell-progress-fill" id="fill-${item.id}" style="width: ${state.percentage}%;"></div>
+                <td style="font-weight: bold; color: var(--text-muted);">${startIdx + idx + 1}</td>
+                <td class="thumb-cell"><img src="${item.thumbnail || 'https://i.ytimg.com/vi/default/hqdefault.jpg'}" alt="Thumb" style="width: 40px; height: 30px; object-fit: cover; border-radius: 4px;"></td>
+                <td class="title-cell" title="${item.title}" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;">${item.title}</td>
+                <td style="text-align: center;">
+                    <div style="display: flex; gap: 0.35rem; justify-content: center; align-items: center;">
+                        ${actionButtons}
+                    </div>
+                </td>
+                <td style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary);">${item.uploader}</td>
+                <td>${formatDuration(item.duration)}</td>
+                <td class="status-cell">
+                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                        <span style="font-size: 0.7rem; font-weight: 700; color: var(--text-primary); text-transform: capitalize;" id="status-text-${item.id}">
+                            ${displayStatus} (${state.percentage}%)
+                        </span>
+                        <div style="width: 100%; height: 4px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden;">
+                            <div id="fill-${item.id}" style="width: ${state.percentage}%; height: 100%; background: var(--neon-blue); transition: width 0.3s ease;"></div>
                         </div>
                     </div>
                 </td>
-                <td class="speed-cell" id="speed-${item.id}">${speedDisplay}</td>
-                <td class="time-cell" id="start-${item.id}">${state.start_time}</td>
-                <td class="time-cell" id="end-${item.id}">${state.end_time}</td>
-                <td><span class="status-detail-cell ${state.status}" id="status-detail-${item.id}" style="${isPlayable ? 'cursor: pointer;' : ''}" title="${isPlayable ? 'Click to Play' : ''}">${state.status}${playIcon}</span></td>
-                <td class="error-detail-cell" id="error-${item.id}" title="${state.error_detail}">${state.error_detail || "--"}</td>
             `;
             
+            // Checkbox event binding
             row.querySelector(".video-checkbox").addEventListener("change", (e) => {
                 if (e.target.checked) {
                     selectedItemIds.add(item.id);
@@ -450,30 +800,247 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 updateSelectionMeta();
                 
-                // Recalculate header checkbox state
-                let allChecked = true;
+                let allCheckedNow = true;
                 pageItems.forEach(pi => {
-                    if (!selectedItemIds.has(pi.id)) allChecked = false;
+                    if (!selectedItemIds.has(pi.id)) allCheckedNow = false;
                 });
-                headerCheckbox.checked = allChecked;
+                headerCheckbox.checked = allCheckedNow;
             });
 
-            // Bind Direct Playback shortcuts on completed tracks
+            if (currentPlaylistId === "deleted_tracks") {
+                // Deleted Tracks action listeners
+                row.querySelector(".row-restore-btn").addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    try {
+                        const res = await fetch(`/api/history/deleted-tracks/${item.id}/restore`, { method: "POST" });
+                        if (res.ok) {
+                            logToTerminal(`[System] Restored "${item.title}" to its original playlist.`);
+                            await loadSidebar();
+                            // Refresh currently active Deleted Tracks view
+                            const delTracks = historyJobs.find(j => j.id === "deleted_tracks");
+                            if (delTracks) selectPlaylist(delTracks);
+                        } else {
+                            const errData = await res.json();
+                            alert(`Restore failed: ${errData.detail}`);
+                        }
+                    } catch (err) {
+                        console.error("Restore failed:", err);
+                    }
+                });
+
+                row.querySelector(".row-perm-delete-btn").addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    if (!confirm(`Are you sure you want to delete "${item.title}" permanently from trash?`)) return;
+                    try {
+                        const res = await fetch(`/api/history/deleted-tracks/${item.id}/permanent`, { method: "DELETE" });
+                        if (res.ok) {
+                            logToTerminal(`[System] Deleted "${item.title}" permanently.`);
+                            await loadSidebar();
+                            const delTracks = historyJobs.find(j => j.id === "deleted_tracks");
+                            if (delTracks) selectPlaylist(delTracks);
+                        }
+                    } catch (err) {
+                        console.error("Permanent delete failed:", err);
+                    }
+                });
+            } else {
+                // Active Playlists action listeners
+                row.querySelector(".row-play-btn").addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    if (!isTrackDownloaded(item)) {
+                        alert("This track is not downloaded yet.");
+                        return;
+                    }
+                    const globalIndex = playlistItems.findIndex(t => t.id === item.id);
+                    playTrack(item, playlistItems, globalIndex);
+                });
+                
+                row.querySelector(".row-play-from-here-btn").addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    if (!isTrackDownloaded(item)) {
+                        alert("This track is not downloaded yet.");
+                        return;
+                    }
+                    const globalIndex = playlistItems.findIndex(t => t.id === item.id);
+                    const subQueue = playlistItems.slice(globalIndex);
+                    playTrack(item, subQueue, 0);
+                });
+
+                row.querySelector(".row-add-playlist-btn").addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    showAddToPlaylistMenu(item, e.currentTarget);
+                });
+
+                if (currentPlaylistId !== "all_downloads") {
+                    row.querySelector(".row-delete-btn").addEventListener("click", async (e) => {
+                        e.stopPropagation();
+                        if (!confirm(`Remove "${item.title}" from this playlist?`)) return;
+                        try {
+                            const res = await fetch(`/api/history/${currentPlaylistId}/tracks/${item.id}`, { method: "DELETE" });
+                            if (res.ok) {
+                                logToTerminal(`[System] Moved "${item.title}" to trash.`);
+                                await loadSidebar();
+                                const updatedJob = historyJobs.find(j => j.id === currentPlaylistId);
+                                if (updatedJob) selectPlaylist(updatedJob);
+                            }
+                        } catch (err) {
+                            console.error("Soft track delete failed:", err);
+                        }
+                    });
+                }
+            }
+
+            // Double click fallback
             if (isPlayable) {
                 row.addEventListener("dblclick", () => {
                     playLocalFile(item.title);
                 });
-                const badge = row.querySelector(".status-detail-cell");
-                if (badge) {
-                    badge.addEventListener("click", (e) => {
-                        e.stopPropagation();
-                        playLocalFile(item.title);
-                    });
-                }
             }
             
             playlistTableBody.appendChild(row);
         });
+    }
+
+    // Floating add-to-playlist dropdown helper
+    function showAddToPlaylistMenu(item, buttonElement) {
+        const existing = document.getElementById("addToPlaylistMenu");
+        if (existing) existing.remove();
+        
+        const menu = document.createElement("div");
+        menu.id = "addToPlaylistMenu";
+        menu.style.position = "absolute";
+        menu.style.background = "var(--card-bg)";
+        menu.style.border = "1px solid var(--border-color)";
+        menu.style.borderRadius = "8px";
+        menu.style.padding = "0.5rem 0";
+        menu.style.boxShadow = "0 10px 25px rgba(0,0,0,0.5)";
+        menu.style.zIndex = "99999";
+        menu.style.fontSize = "0.75rem";
+        menu.style.minWidth = "160px";
+        menu.style.backdropFilter = "blur(12px)";
+        
+        // Filter out virtual / deleted entries
+        const validPlaylists = historyJobs.filter(job => !job.is_virtual && job.id !== "deleted_tracks" && !job.deleted);
+        
+        validPlaylists.forEach(playlist => {
+            const opt = document.createElement("div");
+            opt.className = "menu-item";
+            opt.style.padding = "0.35rem 1rem";
+            opt.style.cursor = "pointer";
+            opt.style.color = "var(--text-primary)";
+            opt.style.transition = "background 0.2s";
+            opt.textContent = playlist.title;
+            
+            opt.addEventListener("mouseover", () => {
+                opt.style.background = "rgba(255, 255, 255, 0.05)";
+            });
+            opt.addEventListener("mouseout", () => {
+                opt.style.background = "transparent";
+            });
+            
+            opt.addEventListener("click", () => {
+                menu.remove();
+                addTrackToPlaylist(item, playlist);
+            });
+            
+            menu.appendChild(opt);
+        });
+        
+        if (validPlaylists.length > 0) {
+            const sep = document.createElement("div");
+            sep.style.borderTop = "1px solid var(--border-color)";
+            sep.style.margin = "0.25rem 0";
+            menu.appendChild(sep);
+        }
+        
+        const createOpt = document.createElement("div");
+        createOpt.className = "menu-item";
+        createOpt.style.padding = "0.35rem 1rem";
+        createOpt.style.cursor = "pointer";
+        createOpt.style.color = "var(--neon-blue)";
+        createOpt.style.fontWeight = "bold";
+        createOpt.textContent = "+ Create New Playlist...";
+        
+        createOpt.addEventListener("mouseover", () => {
+            createOpt.style.background = "rgba(0, 242, 254, 0.08)";
+        });
+        createOpt.addEventListener("mouseout", () => {
+            createOpt.style.background = "transparent";
+        });
+        
+        createOpt.addEventListener("click", () => {
+            menu.remove();
+            createNewPlaylistWithTrack(item);
+        });
+        
+        menu.appendChild(createOpt);
+        
+        document.body.appendChild(menu);
+        
+        const rect = buttonElement.getBoundingClientRect();
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+        
+        menu.style.top = `${rect.bottom + scrollTop}px`;
+        menu.style.left = `${rect.left + scrollLeft}px`;
+        
+        const closeHandler = (e) => {
+            if (!menu.contains(e.target) && e.target !== buttonElement) {
+                menu.remove();
+                document.removeEventListener("mousedown", closeHandler);
+            }
+        };
+        document.addEventListener("mousedown", closeHandler);
+    }
+
+    async function addTrackToPlaylist(item, playlist) {
+        const exists = playlist.items && playlist.items.some(t => t.id === item.id);
+        if (exists) {
+            if (!confirm(`"${item.title}" is already in playlist "${playlist.title}". Do you want to add it anyway?`)) {
+                return;
+            }
+        }
+        
+        try {
+            const res = await fetch(`/api/playlists/${playlist.id}/add-track`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(item)
+            });
+            if (res.ok) {
+                logToTerminal(`[System] Added "${item.title}" to playlist "${playlist.title}".`);
+                await loadSidebar();
+                if (currentPlaylistId === playlist.id) {
+                    const updatedJob = historyJobs.find(j => j.id === playlist.id);
+                    if (updatedJob) selectPlaylist(updatedJob);
+                }
+            } else {
+                const data = await res.json();
+                alert(`Failed to add track: ${data.detail}`);
+            }
+        } catch (e) {
+            console.error("Add track failed:", e);
+        }
+    }
+
+    async function createNewPlaylistWithTrack(item) {
+        const name = prompt("Enter name for the new playlist:");
+        if (!name || !name.trim()) return;
+        
+        try {
+            const res = await fetch("/api/playlists/create", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ title: name.trim() })
+            });
+            if (res.ok) {
+                const newPlaylist = await res.json();
+                logToTerminal(`[System] Created new playlist "${newPlaylist.title}".`);
+                await addTrackToPlaylist(item, newPlaylist);
+            }
+        } catch (e) {
+            console.error("Create playlist failed:", e);
+        }
     }
 
     async function playLocalFile(title) {
@@ -494,13 +1061,17 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Toggle all checkboxes on header click
+    function isTrackDownloaded(track) {
+        const state = localItemStates[track.id] || {};
+        return state.status === "completed" || state.status === "skipped";
+    }
+
+    // Grid checkbox selection operations
     headerCheckbox.addEventListener("change", (e) => {
         const checked = e.target.checked;
         const query = playlistSearch.value.toLowerCase().trim();
         const status = statusFilter.value;
         
-        // Match only items within current search/filter view
         const filtered = playlistItems.filter(item => {
             const title = item.title.toLowerCase();
             const channel = item.uploader.toLowerCase();
@@ -539,77 +1110,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     function updateSelectionMeta() {
-        const selected = getSelectedItems();
-        const checkedCount = selected.length;
-        
-        if (checkedCount === 0) {
-            playlistMeta.textContent = `0 of ${playlistItems.length} items selected`;
-            downloadBtn.disabled = true;
-            return;
-        }
-
-        // Sum durations
-        const totalSeconds = selected.reduce((sum, item) => sum + (item.duration || 0), 0);
-        
-        // Sum file size estimations
-        const format = document.querySelector('input[name="format"]:checked')?.value || "audio";
-        const quality = document.querySelector('input[name="quality"]:checked')?.value || "high";
-        
-        let bytesPerSec = 0.024 * 1024 * 1024;
-        if (format === "audio") {
-            const rates = { low: 0.008, medium: 0.016, high: 0.024, highest: 0.04 };
-            bytesPerSec = (rates[quality] || 0.024) * 1024 * 1024;
-        } else {
-            const rates = { low: 0.05, medium: 0.1, high: 0.2, highest: 0.4 };
-            bytesPerSec = (rates[quality] || 0.2) * 1024 * 1024;
-        }
-        
-        const estSizeBytes = totalSeconds * bytesPerSec;
-        const estSizeMB = (estSizeBytes / (1024 * 1024)).toFixed(0);
-        
-        // Format duration
-        let durationStr = "";
-        const hrs = Math.floor(totalSeconds / 3600);
-        const mins = Math.floor((totalSeconds % 3600) / 60);
-        const secs = Math.floor(totalSeconds % 60);
-        if (hrs > 0) {
-            durationStr = `${hrs}h ${mins}m`;
-        } else if (mins > 0) {
-            durationStr = `${mins}m ${secs}s`;
-        } else {
-            durationStr = `${secs}s`;
-        }
-
-        playlistMeta.textContent = `${checkedCount} of ${playlistItems.length} items selected (${durationStr} | ~${estSizeMB} MB)`;
-        downloadBtn.disabled = false;
+        const selectedCountNum = selectedItemIds.size;
+        document.getElementById("selectedCount").textContent = selectedCountNum;
+        document.getElementById("totalCount").textContent = playlistItems.length;
+        downloadBtn.disabled = selectedCountNum === 0 || currentPlaylistId === "all_downloads" || currentPlaylistId === "deleted_tracks";
     }
 
-    function getSelectedItems() {
-        return playlistItems.filter(item => selectedItemIds.has(item.id));
-    }
-
-    // Interactive Sorting
-    const sortHeaders = document.querySelectorAll("th.sortable");
-    sortHeaders.forEach(th => {
-        th.addEventListener("click", () => {
-            const col = th.getAttribute("data-sort");
-            if (currentSortCol === col) {
-                sortAsc = !sortAsc;
-            } else {
-                currentSortCol = col;
-                sortAsc = true;
-            }
-            
-            sortHeaders.forEach(h => {
-                h.classList.remove("asc", "desc");
-            });
-            th.classList.add(sortAsc ? "asc" : "desc");
-            
-            renderPlaylistTable(playlistItems);
-        });
-    });
-
-    // Combined Filters: Search + Status dropdown (Resets to page 1)
+    // Grid Filters
     playlistSearch.addEventListener("input", () => {
         currentPage = 1;
         renderPlaylistTable(playlistItems);
@@ -619,91 +1126,48 @@ document.addEventListener("DOMContentLoaded", () => {
         renderPlaylistTable(playlistItems);
     });
 
-    // Pagination controls event binding
-    btnFirstPage.addEventListener("click", () => {
-        if (currentPage > 1) {
-            currentPage = 1;
-            renderPlaylistTable(playlistItems);
-        }
-    });
-
     btnPrevPage.addEventListener("click", () => {
         if (currentPage > 1) {
             currentPage--;
             renderPlaylistTable(playlistItems);
         }
     });
-
     btnNextPage.addEventListener("click", () => {
         const query = playlistSearch.value.toLowerCase().trim();
         const status = statusFilter.value;
-        const filteredCount = getFilteredCount(playlistItems, query, status);
-        const totalPages = Math.max(1, Math.ceil(filteredCount / pageSize));
+        const filteredCount = playlistItems.filter(item => {
+            const title = item.title.toLowerCase();
+            const channel = item.uploader.toLowerCase();
+            const state = localItemStates[item.id] || { status: "queued" };
+            const itemStatus = state.status || "queued";
+            const matchesText = title.includes(query) || channel.includes(query);
+            const matchesStatus = (status === "all") || (itemStatus === status);
+            return matchesText && matchesStatus;
+        }).length;
+        
+        const totalPages = Math.ceil(filteredCount / pageSize);
         if (currentPage < totalPages) {
             currentPage++;
             renderPlaylistTable(playlistItems);
         }
     });
 
-    btnLastPage.addEventListener("click", () => {
-        const query = playlistSearch.value.toLowerCase().trim();
-        const status = statusFilter.value;
-        const filteredCount = getFilteredCount(playlistItems, query, status);
-        const totalPages = Math.max(1, Math.ceil(filteredCount / pageSize));
-        if (currentPage < totalPages) {
-            currentPage = totalPages;
-            renderPlaylistTable(playlistItems);
-        }
-    });
-
-    function getFilteredCount(items, query, status) {
-        return items.filter(item => {
-            const title = item.title.toLowerCase();
-            const channel = item.uploader.toLowerCase();
-            const state = localItemStates[item.id] || { status: "queued" };
-            const itemStatus = state.status || "queued";
-            
-            const matchesText = title.includes(query) || channel.includes(query);
-            
-            let matchesStatus = false;
-            if (status === "all") {
-                matchesStatus = true;
-            } else if (status === "queued" && itemStatus === "queued") {
-                matchesStatus = true;
-            } else if (status === "downloading" && itemStatus === "downloading") {
-                matchesStatus = true;
-            } else if (status === "completed" && itemStatus === "completed") {
-                matchesStatus = true;
-            } else if (status === "skipped" && itemStatus === "skipped") {
-                matchesStatus = true;
-            } else if (status === "error" && itemStatus === "error") {
-                matchesStatus = true;
-            }
-            return matchesText && matchesStatus;
-        }).length;
-    }
-
-    // Start download process
+    // Start download action
     downloadBtn.addEventListener("click", async () => {
-        const selected = getSelectedItems();
+        const selected = playlistItems.filter(item => selectedItemIds.has(item.id));
         if (selected.length === 0) return;
 
         const format = document.querySelector('input[name="format"]:checked').value;
         const quality = document.querySelector('input[name="quality"]:checked').value;
-        const skipDuplicates = skipDuplicatesCheckbox.checked;
         const downloadDir = downloadDirInput.value.trim();
-        
         const playlistTitleVal = playlistTitle.textContent;
         const playlistUrlVal = urlInput.value.trim();
 
-        // Display Active HUD
         gridHud.classList.remove("hidden");
         hudJobTitle.textContent = "Queueing download...";
         
-        // Reset local cached states for selection to queued status
         selected.forEach(item => {
             localItemStates[item.id] = {
-                job_num: "--",
                 status: "queued",
                 percentage: 0.0,
                 speed: "--",
@@ -712,8 +1176,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 error_detail: ""
             };
         });
-        
-        // Force refresh grid states
         renderPlaylistTable(playlistItems);
 
         try {
@@ -726,28 +1188,28 @@ document.addEventListener("DOMContentLoaded", () => {
                     quality,
                     playlist_title: playlistTitleVal,
                     playlist_url: playlistUrlVal,
-                    skip_duplicates: skipDuplicates,
+                    skip_duplicates: true,
                     download_dir: downloadDir
                 })
             });
 
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.detail || "Failed to queue download job");
+                throw new Error(data.detail || "Failed to queue download");
             }
 
             const resData = await res.json();
             hudJobTitle.textContent = `Active Job: #${resData.job_num} - ${playlistTitleVal}`;
-
-            // Immediately start progress stream
+            
+            await loadSidebar();
             startProgressStream();
-
         } catch (err) {
             logToTerminal(`[System Error] ${err.message}`, true);
             hudJobTitle.textContent = `Error: ${err.message}`;
         }
     });
 
+    // SSE progress subscription stream
     function startProgressStream() {
         if (currentEventSource) {
             currentEventSource.close();
@@ -757,8 +1219,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         currentEventSource.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            
-            // Show HUD
             gridHud.classList.remove("hidden");
             
             if (data.status === "downloading") {
@@ -769,88 +1229,50 @@ document.addEventListener("DOMContentLoaded", () => {
                 hudJobTitle.textContent = `Completed Job #${data.active_job_num}`;
                 hudSpeed.textContent = "--";
                 hudEta.textContent = "--";
+                loadSidebar();
             } else if (data.status === "failed") {
-                hudJobTitle.textContent = `Failed Job #${data.active_job_num}: ${data.error}`;
+                hudJobTitle.textContent = `Failed Job #${data.active_job_num}`;
                 hudSpeed.textContent = "--";
                 hudEta.textContent = "--";
             }
 
-            // Sync item states directly in DOM rows and local cache
             if (data.item_states) {
                 let completedCount = 0;
                 const totalCount = Object.keys(data.item_states).length;
-                let triggerTableRedraw = false;
+                let triggerRedraw = false;
 
                 Object.keys(data.item_states).forEach(id => {
                     const itemState = data.item_states[id];
                     const oldState = localItemStates[id] || {};
-                    
-                    const wasDone = (oldState.status === "completed" || oldState.status === "skipped" || oldState.status === "error");
                     const isDone = (itemState.status === "completed" || itemState.status === "skipped" || itemState.status === "error");
+                    const wasDone = (oldState.status === "completed" || oldState.status === "skipped" || oldState.status === "error");
 
-                    // Trigger pagination redraw to push done item to the last page!
                     if (isDone && !wasDone) {
-                        triggerTableRedraw = true;
+                        triggerRedraw = true;
                     }
 
-                    // Cache state
                     localItemStates[id] = itemState;
-                    
-                    // Increment overall progress completed count
-                    if (isDone) {
-                        completedCount++;
-                    }
+                    if (isDone) completedCount++;
 
-                    // Dynamically update elements inside table row for real-time responsiveness
-                    const jobCell = document.getElementById(`job-${id}`);
-                    const percentCell = document.getElementById(`percent-val-${id}`);
-                    const fillCell = document.getElementById(`fill-${id}`);
-                    const speedCell = document.getElementById(`speed-${id}`);
-                    const startCell = document.getElementById(`start-${id}`);
-                    const endCell = document.getElementById(`end-${id}`);
-                    const detailCell = document.getElementById(`status-detail-${id}`);
-                    const errorCell = document.getElementById('error-' + id);
-
-                    if (jobCell) {
-                        const activeTitle = playlistTitle.textContent || "Download";
-                        const jobDisplay = itemState.job_num !== "--" ? `#${itemState.job_num} - ${activeTitle}` : "--";
-                        jobCell.textContent = jobDisplay;
-                        jobCell.title = jobDisplay;
-                    }
-                    if (percentCell) percentCell.textContent = `${itemState.percentage}%`;
-                    if (fillCell) fillCell.style.width = `${itemState.percentage}%`;
-                    if (speedCell) speedCell.textContent = itemState.speed !== "0 KB/s" ? itemState.speed : "--";
-                    if (startCell) startCell.textContent = itemState.start_time;
-                    if (endCell) endCell.textContent = itemState.end_time;
-                    if (detailCell) {
-                        const isPlayable = (itemState.status === "completed" || itemState.status === "skipped");
-                        const playIcon = isPlayable ? " ▶" : "";
-                        detailCell.textContent = `${itemState.status}${playIcon}`;
-                        detailCell.className = `status-detail-cell ${itemState.status}`;
-                        detailCell.style.cursor = isPlayable ? 'pointer' : '';
-                        detailCell.title = isPlayable ? 'Click to Play' : '';
-                    }
-                    if (errorCell) {
-                        errorCell.textContent = itemState.error_detail || "--";
-                        errorCell.title = itemState.error_detail || "";
-                    }
+                    const statusText = document.getElementById(`status-text-${id}`);
+                    const fill = document.getElementById(`fill-${id}`);
+                    const displayStatusStr = itemState.status === "skipped" ? "Downloaded" : itemState.status;
+                    if (statusText) statusText.textContent = `${displayStatusStr} (${itemState.percentage}%)`;
+                    if (fill) fill.style.width = `${itemState.percentage}%`;
                 });
 
-                hudProgressCount.textContent = `${completedCount} / ${totalCount} Completed (Pending: ${totalCount - completedCount})`;
-
-                // If any item transitioned to completed/done, redraw the table to automatically move it to the last page!
-                if (triggerTableRedraw) {
+                hudProgressCount.textContent = `${completedCount} / ${totalCount}`;
+                if (triggerRedraw) {
                     renderPlaylistTable(playlistItems);
                 }
             }
 
-            // Render logs
             if (data.logs && data.logs.length > 0) {
                 consoleLogs.innerHTML = "";
                 data.logs.forEach(log => {
                     const p = document.createElement("p");
                     p.textContent = log;
-                    if (log.startsWith("[System Error]") || log.startsWith("Error") || log.startsWith("Fatal worker error")) {
+                    if (log.startsWith("[System Error]") || log.startsWith("Error")) {
                         p.style.color = "var(--error)";
                     } else if (log.startsWith("Finished downloading")) {
                         p.style.color = "var(--success)";
@@ -862,33 +1284,574 @@ document.addEventListener("DOMContentLoaded", () => {
                 consoleLogs.scrollTop = consoleLogs.scrollHeight;
             }
 
-            // Terminal end state (This individual job finished)
             if (data.status === "completed" || data.status === "failed") {
                 currentEventSource.close();
                 currentEventSource = null;
             }
         };
-
-        currentEventSource.onerror = (e) => {
-            console.log("SSE update stream connected");
-        };
     }
 
-    function logToTerminal(msg, isError = false) {
-        const p = document.createElement("p");
-        p.textContent = msg;
-        if (isError) {
-            p.style.color = "var(--error)";
+    function generateShuffleOrder(tracks, currentTrackId = null) {
+        let downloadedTracks = tracks.filter(t => isTrackDownloaded(t));
+        if (downloadedTracks.length === 0) return [];
+        
+        let ids = downloadedTracks.map(t => t.id);
+        
+        // Fisher-Yates shuffle
+        for (let i = ids.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [ids[i], ids[j]] = [ids[j], ids[i]];
         }
-        consoleLogs.appendChild(p);
-        consoleLogs.scrollTop = consoleLogs.scrollHeight;
+        
+        // If currentTrackId is specified, place it at index 0
+        if (currentTrackId) {
+            const idx = ids.indexOf(currentTrackId);
+            if (idx > -1) {
+                ids.splice(idx, 1);
+                ids.unshift(currentTrackId);
+            }
+        }
+        
+        return ids;
     }
 
-    // Opening downloads folder
-    async function openLocalDownloadsFolder() {
+    // Media Player Control state machine
+    async function playTrack(track, queue, index, shuffleIndex = null, shuffleOrder = null) {
+        if (!track) return;
+        
+        if (nextTrackTimeout) {
+            clearTimeout(nextTrackTimeout);
+            nextTrackTimeout = null;
+        }
+        if (nextTrackCountdownInterval) {
+            clearInterval(nextTrackCountdownInterval);
+            nextTrackCountdownInterval = null;
+        }
+        
+        playQueue = queue || [track];
+        currentTrackIndex = index !== undefined ? index : playQueue.findIndex(t => t.id === track.id);
+        
+        playerTrackTitle.textContent = track.title;
+        playerTrackArtist.textContent = track.uploader || "Unknown";
+        playerTrackThumb.src = track.thumbnail || `https://i.ytimg.com/vi/${track.id}/hqdefault.jpg`;
+        
+        const format = document.querySelector('input[name="format"]:checked')?.value || "audio";
+        const downloadDir = downloadDirInput.value.trim();
+        
+        if (format === "video") {
+            playerVideo.style.display = "block";
+            playerAudioArtPanel.style.display = "none";
+        } else {
+            playerVideo.style.display = "none";
+            playerAudioArtPanel.style.display = "flex";
+        }
+        
+        playerTrackStatus.innerHTML = `<span class="equalizer-bar" style="width: 2px; height: 8px; background: var(--neon-blue); display: inline-block;"></span> Loading...`;
+        
+        try {
+            const streamUrl = `/api/media/stream?video_url=${encodeURIComponent(track.url)}&title=${encodeURIComponent(track.title)}&format=${format}&download_dir=${encodeURIComponent(downloadDir)}`;
+            
+            playerVideo.src = streamUrl;
+            playerVideo.load();
+            
+            await playerVideo.play();
+            isPlaying = true;
+            updatePlayBtnUI();
+            
+            playerTrackStatus.innerHTML = `
+                <span class="equalizer-bar" style="width: 2px; height: 8px; background: var(--neon-blue); display: inline-block;"></span>
+                <span class="equalizer-bar" style="width: 2px; height: 8px; background: var(--neon-blue); display: inline-block; animation-delay: 0.15s;"></span>
+                <span class="equalizer-bar" style="width: 2px; height: 8px; background: var(--neon-blue); display: inline-block; animation-delay: 0.3s;"></span>
+                Playing
+            `;
+
+            savePlaybackPosition(track.id, shuffleIndex, shuffleOrder);
+        } catch (err) {
+            console.error("Playback failed:", err);
+            playerTrackStatus.textContent = "Error Playing File";
+            isPlaying = false;
+            updatePlayBtnUI();
+        }
+    }
+
+    async function savePlaybackPosition(trackId, shuffleIndex = null, shuffleOrder = null) {
+        if (!currentPlaylistId || currentPlaylistId === "all_downloads" || currentPlaylistId === "deleted_tracks") return;
+        
+        const job = historyJobs.find(j => j.id === currentPlaylistId) || {};
+        
+        let finalShuffleOrder = shuffleOrder;
+        let finalShuffleIndex = shuffleIndex;
+        
+        if (isShuffle) {
+            if (!finalShuffleOrder) {
+                finalShuffleOrder = job.shuffle_order || [];
+                if (finalShuffleOrder.length === 0 || !finalShuffleOrder.includes(trackId)) {
+                    finalShuffleOrder = generateShuffleOrder(playQueue, trackId);
+                    finalShuffleIndex = 0;
+                } else {
+                    finalShuffleIndex = finalShuffleOrder.indexOf(trackId);
+                }
+            }
+        } else {
+            finalShuffleOrder = null;
+            finalShuffleIndex = null;
+        }
+        
+        const payload = {
+            track_id: trackId,
+            shuffle_mode: isShuffle,
+            shuffle_order: finalShuffleOrder,
+            shuffle_index: finalShuffleIndex
+        };
+        
+        try {
+            await fetch(`/api/history/${currentPlaylistId}/last-played`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (job) {
+                job.last_played_track_id = trackId;
+                job.last_played_shuffle = isShuffle;
+                job.shuffle_order = payload.shuffle_order;
+                job.shuffle_index = payload.shuffle_index;
+            }
+        } catch (e) {
+            console.error("Playback position save failed:", e);
+        }
+    }
+
+    function updatePlayBtnUI() {
+        const svg = document.getElementById("playIconSvg");
+        if (isPlaying) {
+            svg.innerHTML = `<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>`;
+        } else {
+            svg.innerHTML = `<polygon points="5 3 19 12 5 21 5 3"/>`;
+        }
+    }
+
+    // Media Player DOM Listeners
+    playerPlayPauseBtn.addEventListener("click", () => {
+        if (!playerVideo.src) return;
+        if (isPlaying) {
+            playerVideo.pause();
+            isPlaying = false;
+        } else {
+            playerVideo.play();
+            isPlaying = true;
+        }
+        updatePlayBtnUI();
+    });
+
+    playerNextBtn.addEventListener("click", playNextTrack);
+    playerPrevBtn.addEventListener("click", playPrevTrack);
+
+    function playNextTrack() {
+        if (playQueue.length === 0) return;
+        
+        if (isShuffle) {
+            const job = historyJobs.find(j => j.id === currentPlaylistId) || {};
+            let order = job.shuffle_order || [];
+            let sIdx = job.shuffle_index !== undefined ? job.shuffle_index : -1;
+            
+            if (order.length === 0) {
+                const currentTrack = playQueue[currentTrackIndex];
+                order = generateShuffleOrder(playQueue, currentTrack ? currentTrack.id : null);
+                sIdx = 0;
+            } else {
+                sIdx++;
+            }
+            
+            if (sIdx >= order.length) {
+                sIdx = 0; // Loop around
+            }
+            
+            const nextTrackId = order[sIdx];
+            const nextTrack = playQueue.find(t => t.id === nextTrackId);
+            
+            if (nextTrack) {
+                const origIndex = playQueue.findIndex(t => t.id === nextTrackId);
+                playTrack(nextTrack, playQueue, origIndex, sIdx, order);
+            } else {
+                logToTerminal("[Player] Next track not found in shuffle queue.");
+            }
+        } else {
+            let startIndex = currentTrackIndex;
+            let nextIndex = currentTrackIndex;
+            let found = false;
+            
+            for (let i = 1; i <= playQueue.length; i++) {
+                nextIndex = (startIndex + i) % playQueue.length;
+                if (isTrackDownloaded(playQueue[nextIndex])) {
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (found) {
+                playTrack(playQueue[nextIndex], playQueue, nextIndex);
+            } else {
+                logToTerminal("[Player] No downloaded tracks in queue to skip to.");
+            }
+        }
+    }
+
+    function playPrevTrack() {
+        if (playQueue.length === 0) return;
+        
+        if (isShuffle) {
+            const job = historyJobs.find(j => j.id === currentPlaylistId) || {};
+            let order = job.shuffle_order || [];
+            let sIdx = job.shuffle_index !== undefined ? job.shuffle_index : -1;
+            
+            if (order.length === 0) {
+                const currentTrack = playQueue[currentTrackIndex];
+                order = generateShuffleOrder(playQueue, currentTrack ? currentTrack.id : null);
+                sIdx = 0;
+            } else {
+                sIdx--;
+            }
+            
+            if (sIdx < 0) {
+                sIdx = order.length - 1; // Loop back
+            }
+            
+            const prevTrackId = order[sIdx];
+            const prevTrack = playQueue.find(t => t.id === prevTrackId);
+            
+            if (prevTrack) {
+                const origIndex = playQueue.findIndex(t => t.id === prevTrackId);
+                playTrack(prevTrack, playQueue, origIndex, sIdx, order);
+            } else {
+                logToTerminal("[Player] Previous track not found in shuffle queue.");
+            }
+        } else {
+            let startIndex = currentTrackIndex;
+            let prevIndex = currentTrackIndex;
+            let found = false;
+            
+            for (let i = 1; i <= playQueue.length; i++) {
+                prevIndex = (startIndex - i + playQueue.length) % playQueue.length;
+                if (isTrackDownloaded(playQueue[prevIndex])) {
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (found) {
+                playTrack(playQueue[prevIndex], playQueue, prevIndex);
+            } else {
+                logToTerminal("[Player] No downloaded tracks in queue to skip to.");
+            }
+        }
+    }
+
+    playerVideo.addEventListener("ended", () => {
+        if (isRepeat) {
+            playerVideo.currentTime = 0;
+            playerVideo.play();
+        } else {
+            if (nextTrackTimeout) {
+                clearTimeout(nextTrackTimeout);
+                nextTrackTimeout = null;
+            }
+            if (nextTrackCountdownInterval) {
+                clearInterval(nextTrackCountdownInterval);
+                nextTrackCountdownInterval = null;
+            }
+            
+            const pauseInput = document.getElementById("playerPauseSeconds");
+            const pauseSecs = pauseInput ? parseInt(pauseInput.value) : 5;
+            
+            if (pauseSecs > 0) {
+                let count = pauseSecs;
+                playerTrackStatus.textContent = `Pause (${count}s)...`;
+                
+                nextTrackCountdownInterval = setInterval(() => {
+                    count--;
+                    if (count > 0) {
+                        playerTrackStatus.textContent = `Pause (${count}s)...`;
+                    } else {
+                        clearInterval(nextTrackCountdownInterval);
+                        nextTrackCountdownInterval = null;
+                    }
+                }, 1000);
+                
+                nextTrackTimeout = setTimeout(() => {
+                    if (nextTrackCountdownInterval) {
+                        clearInterval(nextTrackCountdownInterval);
+                        nextTrackCountdownInterval = null;
+                    }
+                    playNextTrack();
+                }, pauseSecs * 1000);
+            } else {
+                playNextTrack();
+            }
+        }
+    });
+
+    // Time progress trackers
+    playerVideo.addEventListener("timeupdate", () => {
+        if (playerVideo.duration) {
+            const current = playerVideo.currentTime;
+            const duration = playerVideo.duration;
+            playerProgressBar.value = (current / duration) * 100;
+            playerCurrentTime.textContent = formatDuration(current);
+            playerTotalTime.textContent = formatDuration(duration);
+        }
+    });
+
+    playerProgressBar.addEventListener("input", (e) => {
+        if (playerVideo.duration) {
+            playerVideo.currentTime = (e.target.value / 100) * playerVideo.duration;
+        }
+    });
+
+    playerShuffleBtn.addEventListener("click", () => {
+        isShuffle = !isShuffle;
+        playerShuffleBtn.classList.toggle("active", isShuffle);
+        
+        const job = historyJobs.find(j => j.id === currentPlaylistId);
+        if (isShuffle) {
+            const currentTrack = playQueue[currentTrackIndex];
+            const order = generateShuffleOrder(playQueue, currentTrack ? currentTrack.id : null);
+            if (job) {
+                job.shuffle_order = order;
+                job.shuffle_index = 0;
+            }
+            if (currentTrack) {
+                savePlaybackPosition(currentTrack.id, 0, order);
+            }
+        } else {
+            if (job) {
+                job.shuffle_order = null;
+                job.shuffle_index = null;
+            }
+            const currentTrack = playQueue[currentTrackIndex];
+            if (currentTrack) {
+                savePlaybackPosition(currentTrack.id, null, null);
+            }
+        }
+    });
+
+    playerRepeatBtn.addEventListener("click", () => {
+        isRepeat = !isRepeat;
+        playerRepeatBtn.classList.toggle("active", isRepeat);
+    });
+
+    // Volume controllers
+    playerVolumeSlider.addEventListener("input", (e) => {
+        playerVideo.volume = e.target.value / 100;
+        isMuted = (playerVideo.volume === 0);
+    });
+
+    playerVolumeBtn.addEventListener("click", () => {
+        isMuted = !isMuted;
+        if (isMuted) {
+            lastVolume = playerVolumeSlider.value;
+            playerVideo.volume = 0;
+            playerVolumeSlider.value = 0;
+            playerVolumeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v6a3 3 0 0 0 3 3h3.58l4.42 4.42V12M22 9.42A9 9 0 0 0 9.42 22"/></svg>`;
+        } else {
+            playerVideo.volume = lastVolume / 100;
+            playerVolumeSlider.value = lastVolume;
+            playerVolumeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
+        }
+    });
+
+    // Maximize Video toggle overlay (YouTube style overlay controls)
+    let fullscreenTimeout = null;
+    const playerControlsContainer = document.getElementById("playerControlsContainer");
+    
+    playerMaximizeBtn.addEventListener("click", () => {
+        isMaximized = !isMaximized;
+        if (isMaximized) {
+            playerControlsContainer.classList.add("maximized");
+            playerMaximizeBtn.title = "Minimize Player";
+            playerMaximizeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7"/></svg>`;
+            
+            setupFullscreenAutoHide();
+        } else {
+            playerControlsContainer.classList.remove("maximized");
+            playerControlsContainer.classList.remove("idle");
+            playerMaximizeBtn.title = "Maximize Player";
+            playerMaximizeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>`;
+            
+            if (fullscreenTimeout) {
+                clearTimeout(fullscreenTimeout);
+                fullscreenTimeout = null;
+            }
+        }
+    });
+
+    function setupFullscreenAutoHide() {
+        if (fullscreenTimeout) clearTimeout(fullscreenTimeout);
+        playerControlsContainer.addEventListener("mousemove", handleFullscreenMouseMove);
+    }
+
+    function handleFullscreenMouseMove() {
+        if (!isMaximized) {
+            playerControlsContainer.removeEventListener("mousemove", handleFullscreenMouseMove);
+            return;
+        }
+        
+        playerControlsContainer.classList.remove("idle");
+        clearTimeout(fullscreenTimeout);
+        
+        fullscreenTimeout = setTimeout(() => {
+            if (isMaximized && isPlaying) {
+                playerControlsContainer.classList.add("idle");
+            }
+        }, 3000);
+    }
+
+    // Column resizing handles injection helper
+    function initResizableColumns() {
+        const table = document.querySelector(".playlist-table-wrapper table");
+        if (!table) return;
+        
+        const row = table.querySelector("thead tr");
+        const cols = row ? row.children : [];
+        
+        for (let i = 0; i < cols.length; i++) {
+            if (i < 2) continue; // Don't resize checkbox and index columns
+            
+            let resizer = cols[i].querySelector(".col-resizer");
+            if (!resizer) {
+                resizer = document.createElement("div");
+                resizer.className = "col-resizer";
+                cols[i].appendChild(resizer);
+                cols[i].style.position = "relative";
+                setupResizerEvents(resizer, cols[i]);
+            }
+        }
+    }
+
+    function setupResizerEvents(resizer, col) {
+        let x = 0;
+        let w = 0;
+        
+        const mouseMoveHandler = (e) => {
+            const dx = e.clientX - x;
+            const newWidth = Math.max(45, w + dx);
+            col.style.width = `${newWidth}px`;
+            col.style.minWidth = `${newWidth}px`;
+            col.style.maxWidth = `${newWidth}px`;
+        };
+        
+        const mouseUpHandler = () => {
+            document.removeEventListener("mousemove", mouseMoveHandler);
+            document.removeEventListener("mouseup", mouseUpHandler);
+            resizer.classList.remove("resizing");
+        };
+        
+        resizer.addEventListener("mousedown", (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            x = e.clientX;
+            const styles = window.getComputedStyle(col);
+            w = parseInt(styles.width, 10);
+            
+            resizer.classList.add("resizing");
+            document.addEventListener("mousemove", mouseMoveHandler);
+            document.addEventListener("mouseup", mouseUpHandler);
+        });
+    }
+
+    // Analyze YouTube link input
+    analyzeBtn.addEventListener("click", analyzeLink);
+    urlInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") analyzeLink();
+    });
+
+    async function analyzeLink() {
+        const url = urlInput.value.trim();
+        if (!url) {
+            showError("Please paste a valid YouTube video or playlist URL first.");
+            return;
+        }
+
+        hideError();
+        analyzeBtn.disabled = true;
+        analyzeSpinner.classList.remove("hidden");
+        logToTerminal(`[System] Fetching playlist metadata from YouTube...`);
+
+        try {
+            const res = await fetch("/api/fetch-info", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url })
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.detail || "Link extraction failed.");
+            }
+
+            const data = await res.json();
+            playlistItems = data.entries || [];
+            playlistTitle.textContent = data.title || "YouTube Playlist";
+            playlistMetaInfo.textContent = `${playlistItems.length} tracks fetched from YouTube. Selection ready.`;
+
+            localItemStates = {};
+            selectedItemIds.clear();
+            currentPage = 1;
+
+            playlistItems.forEach(item => {
+                localItemStates[item.id] = {
+                    status: "queued",
+                    percentage: 0.0,
+                    speed: "--",
+                    start_time: "--",
+                    end_time: "--",
+                    error_detail: ""
+                };
+                selectedItemIds.add(item.id);
+            });
+
+            playQueue = playlistItems;
+            currentTrackIndex = 0;
+
+            renderPlaylistTable(playlistItems);
+            updateSelectionMeta();
+            logToTerminal(`[System] Metadata extraction complete. Selected ${playlistItems.length} items.`);
+
+        } catch (err) {
+            showError(err.message);
+            logToTerminal(`[Error] Metadata extraction failed: ${err.message}`, true);
+        } finally {
+            analyzeBtn.disabled = false;
+            analyzeSpinner.classList.add("hidden");
+        }
+    }
+
+    // Default download directory config load
+    async function loadDefaultDir() {
+        try {
+            const res = await fetch("/api/settings/dir");
+            const data = await res.json();
+            downloadDirInput.value = data.download_dir;
+        } catch (e) {
+            console.error("Failed to load default download dir settings:", e);
+        }
+    }
+
+    browseDirBtn.addEventListener("click", async () => {
+        try {
+            const res = await fetch("/api/settings/browse", { method: "POST" });
+            const data = await res.json();
+            if (data.download_dir) {
+                downloadDirInput.value = data.download_dir;
+            }
+        } catch (e) {
+            console.error("Directory browse error:", e);
+        }
+    });
+
+    openFolderBtn.addEventListener("click", async () => {
         const downloadDir = downloadDirInput.value.trim();
         try {
-            const res = await fetch("/api/open-folder", { 
+            const res = await fetch("/api/open-folder", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ download_dir: downloadDir })
@@ -900,214 +1863,238 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (e) {
             alert(`Error opening folder: ${e.message}`);
         }
-    }
-
-    openFolderBtn.addEventListener("click", openLocalDownloadsFolder);
-
-    // History Modal actions
-    historyBtn.addEventListener("click", openHistoryModal);
-    closeHistoryModalBtn.addEventListener("click", () => {
-        historyModal.classList.add("hidden");
-    });
-    
-    clearHistoryBtn.addEventListener("click", async () => {
-        if (!confirm("Are you sure you want to clear your download history?")) return;
-        try {
-            await fetch("/api/history/clear", { method: "POST" });
-            loadHistoryItems();
-        } catch (e) {
-            console.error("Error clearing history:", e);
-        }
     });
 
-    async function openHistoryModal() {
-        historyModal.classList.remove("hidden");
-        loadHistoryItems();
-    }
-
-    // Bind event listeners to Jobs search filters
-    historySearch.addEventListener("input", filterAndRenderHistory);
-    historyTypeFilter.addEventListener("change", filterAndRenderHistory);
-
-    async function loadHistoryItems() {
-        historyTableBody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Loading logs...</td></tr>`;
-        try {
-            const res = await fetch("/api/history");
-            historyItemsCache = await res.json();
-            filterAndRenderHistory();
-        } catch (e) {
-            historyTableBody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--error); padding: 1.5rem;">Failed to load history: ${e.message}</td></tr>`;
-        }
-    }
-
-    function filterAndRenderHistory() {
-        const query = historySearch.value.toLowerCase().trim();
-        const typeFilter = historyTypeFilter.value;
-        
-        const filtered = historyItemsCache.filter(item => {
-            const title = item.title.toLowerCase();
-            const matchesText = title.includes(query);
-            
-            const isPlaylist = item.is_playlist || item.total_tracks > 1;
-            let matchesType = false;
-            if (typeFilter === "all") {
-                matchesType = true;
-            } else if (typeFilter === "playlist" && isPlaylist) {
-                matchesType = true;
-            } else if (typeFilter === "single" && !isPlaylist) {
-                matchesType = true;
-            }
-            
-            return matchesText && matchesType;
-        });
-        
-        renderHistory(filtered);
-    }
-
-    function renderHistory(items) {
-        historyTableBody.innerHTML = "";
-        if (!items || items.length === 0) {
-            historyTableBody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 2rem 0;">No download logs found.</td></tr>`;
+    // YouTube player keyboard shortcuts listener
+    document.addEventListener("keydown", (e) => {
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "SELECT" || activeEl.tagName === "TEXTAREA" || activeEl.isContentEditable)) {
             return;
         }
 
-        items.forEach(item => {
-            const row = document.createElement("tr");
-            
-            // Find all history entries with the exact same URL to compute URL-specific stats
-            const relatedEntries = historyItemsCache.filter(h => h.url && h.url === item.url);
-            const timesDownloaded = relatedEntries.length;
-            
-            // Sort related entries by timestamp ascending to determine first and last run dates
-            const sortedRelated = [...relatedEntries].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-            
-            const firstDateStr = sortedRelated.length > 0 
-                ? new Date(sortedRelated[0].timestamp).toLocaleString() 
-                : new Date(item.timestamp).toLocaleString();
-                
-            const lastDateStr = sortedRelated.length > 0 
-                ? new Date(sortedRelated[sortedRelated.length - 1].timestamp).toLocaleString() 
-                : new Date(item.timestamp).toLocaleString();
-            
-            const isPlaylist = item.is_playlist || item.total_tracks > 1;
-            const typeLabel = isPlaylist ? "Playlist" : "Single File";
-            const typeClass = isPlaylist ? "badge-video" : "badge-quality";
-            
-            const successCount = item.success_count || 0;
-            const failureCount = item.failure_count || 0;
-            
-            const jobNumDisplay = item.job_num ? `#${item.job_num} - ${item.title}` : "--";
-
-            row.innerHTML = `
-                <td class="job-cell" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;" title="${jobNumDisplay}">${jobNumDisplay}</td>
-                <td><span class="history-badge ${typeClass}">${typeLabel}</span></td>
-                <td style="font-weight: 600; color: var(--text-primary);" title="${item.title}">${item.title}</td>
-                <td class="duration-cell" style="text-align: center;">${item.total_tracks}</td>
-                <td class="duration-cell" style="text-align: center; font-family: var(--font-mono); font-weight: 700; color: var(--neon-blue);">${timesDownloaded}</td>
-                <td class="time-cell">${firstDateStr}</td>
-                <td class="time-cell">${lastDateStr}</td>
-                <td style="color: #27c93f; font-weight: 700; font-family: var(--font-mono); text-align: center;">${successCount}</td>
-                <td style="color: var(--error); font-weight: 700; font-family: var(--font-mono); text-align: center;">${failureCount}</td>
-                <td>
-                    <div style="display: flex; gap: 0.4rem; align-items: center;">
-                        <button class="btn btn-secondary btn-sm load-grid-btn" data-url="${item.url}" style="padding: 0.35rem 0.6rem; font-size: 0.75rem;" title="Load items into main grid">
-                            Load Grid
-                        </button>
-                        <button class="btn btn-primary btn-sm redownload-btn" data-id="${item.id}" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple)); border: none;" title="Resume / Download delta new items only">
-                            Delta D/L
-                        </button>
-                        <button class="btn btn-secondary btn-sm force-all-btn" data-id="${item.id}" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; border: 1px solid var(--error); color: var(--error); background: transparent;" title="Force re-download all items in playlist">
-                            Force All
-                        </button>
-                    </div>
-                </td>
-            `;
-
-            row.querySelector(".load-grid-btn").addEventListener("click", (e) => {
-                const url = e.target.getAttribute("data-url");
-                urlInput.value = url;
-                historyModal.classList.add("hidden");
-                analyzeLink();
-            });
-
-            row.querySelector(".redownload-btn").addEventListener("click", async (e) => {
-                const jobId = e.target.getAttribute("data-id");
-                e.target.disabled = true;
-                e.target.textContent = "Queueing...";
-                try {
-                    const res = await fetch("/api/history/resume", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ job_id: jobId, force_all: false })
-                    });
-                    if (res.ok) {
-                        historyModal.classList.add("hidden");
-                        
-                        // Clear grid status caches and redraw
-                        localItemStates = {};
-                        renderPlaylistTable(playlistItems);
-
-                        startProgressStream();
-                    } else {
-                        const err = await res.json();
-                        alert(`Failed to resume job: ${err.detail}`);
-                        e.target.disabled = false;
-                        e.target.textContent = "Delta D/L";
-                    }
-                } catch (err) {
-                    alert(`Error: ${err.message}`);
-                    e.target.disabled = false;
-                    e.target.textContent = "Delta D/L";
+        let handled = false;
+        const key = e.key.toLowerCase();
+        
+        switch (key) {
+            case " ":
+            case "k":
+                playerPlayPauseBtn.click();
+                handled = true;
+                break;
+            case "j":
+                if (playerVideo.duration) {
+                    playerVideo.currentTime = Math.max(0, playerVideo.currentTime - 10);
                 }
-            });
-
-            row.querySelector(".force-all-btn").addEventListener("click", async (e) => {
-                const jobId = e.target.getAttribute("data-id");
-                e.target.disabled = true;
-                e.target.textContent = "Queueing...";
-                try {
-                    const res = await fetch("/api/history/resume", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ job_id: jobId, force_all: true })
-                    });
-                    if (res.ok) {
-                        historyModal.classList.add("hidden");
-                        
-                        // Clear grid status caches and redraw
-                        localItemStates = {};
-                        renderPlaylistTable(playlistItems);
-
-                        startProgressStream();
-                    } else {
-                        const err = await res.json();
-                        alert(`Failed to force download: ${err.detail}`);
-                        e.target.disabled = false;
-                        e.target.textContent = "Force All";
-                    }
-                } catch (err) {
-                    alert(`Error: ${err.message}`);
-                    e.target.disabled = false;
-                    e.target.textContent = "Force All";
+                handled = true;
+                break;
+            case "l":
+                if (playerVideo.duration) {
+                    playerVideo.currentTime = Math.min(playerVideo.duration, playerVideo.currentTime + 10);
                 }
-            });
+                handled = true;
+                break;
+            case "arrowleft":
+                if (playerVideo.duration) {
+                    playerVideo.currentTime = Math.max(0, playerVideo.currentTime - 5);
+                }
+                handled = true;
+                break;
+            case "arrowright":
+                if (playerVideo.duration) {
+                    playerVideo.currentTime = Math.min(playerVideo.duration, playerVideo.currentTime + 5);
+                }
+                handled = true;
+                break;
+            case "arrowup":
+                playerVolumeSlider.value = Math.min(100, parseInt(playerVolumeSlider.value) + 5);
+                playerVolumeSlider.dispatchEvent(new Event("input"));
+                handled = true;
+                break;
+            case "arrowdown":
+                playerVolumeSlider.value = Math.max(0, parseInt(playerVolumeSlider.value) - 5);
+                playerVolumeSlider.dispatchEvent(new Event("input"));
+                handled = true;
+                break;
+            case "m":
+                playerVolumeBtn.click();
+                handled = true;
+                break;
+            case "f":
+                playerMaximizeBtn.click();
+                handled = true;
+                break;
+            case "n":
+                if (e.shiftKey) {
+                    playNextTrack();
+                    handled = true;
+                }
+                break;
+            case "p":
+                if (e.shiftKey) {
+                    playPrevTrack();
+                    handled = true;
+                }
+                break;
+        }
 
-            historyTableBody.appendChild(row);
+        if (e.key >= "0" && e.key <= "9") {
+            if (playerVideo.duration) {
+                const pct = parseInt(e.key) * 10;
+                playerVideo.currentTime = (pct / 100) * playerVideo.duration;
+                handled = true;
+            }
+        }
+
+        if (handled) {
+            e.preventDefault();
+        }
+    });
+
+    // Start-up initialization
+    loadDefaultDir();
+    loadSidebar();
+    initResizableColumns();
+
+    // Settings Modal Triggers
+    const btnOpenSettings = document.getElementById("btnOpenSettings");
+    const settingsModal = document.getElementById("settingsModal");
+    const btnCloseSettings = document.getElementById("btnCloseSettings");
+    const btnSaveSettings = document.getElementById("btnSaveSettings");
+    
+    if (btnOpenSettings && settingsModal) {
+        btnOpenSettings.addEventListener("click", () => {
+            settingsModal.classList.remove("hidden");
+            shadowInputFix();
+            checkYtdlpVersion();
+        });
+    }
+    
+    if (btnCloseSettings && settingsModal) {
+        btnCloseSettings.addEventListener("click", () => {
+            settingsModal.classList.add("hidden");
+        });
+    }
+    
+    if (btnSaveSettings && settingsModal) {
+        btnSaveSettings.addEventListener("click", () => {
+            settingsModal.classList.add("hidden");
+            logToTerminal("[System] Settings saved and applied successfully.");
         });
     }
 
-    function shadowInputFix() {
-        const initialFormat = document.querySelector('input[name="format"]:checked');
-        if (initialFormat) {
-            initialFormat.closest(".header-pill-btn")?.classList.add("active");
+    // yt-dlp version check and update
+    async function checkYtdlpVersion() {
+        const currentEl = document.getElementById("ytdlpCurrentVersion");
+        const latestEl = document.getElementById("ytdlpLatestVersion");
+        const statusEl = document.getElementById("ytdlpStatusText");
+        const updateBtn = document.getElementById("btnUpdateYtdlp");
+        
+        currentEl.textContent = "Checking...";
+        latestEl.textContent = "Checking...";
+        statusEl.style.color = "var(--text-muted)";
+        statusEl.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align: middle; margin-right: 4px; animation: spin 0.8s infinite linear;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Checking...`;
+        updateBtn.classList.add("hidden");
+        
+        try {
+            const res = await fetch("/api/ytdlp-version");
+            const data = await res.json();
+            
+            currentEl.textContent = data.current_version;
+            latestEl.textContent = data.latest_version;
+            
+            if (data.update_available) {
+                statusEl.style.color = "#ffbd2e";
+                statusEl.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align: middle; margin-right: 4px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Update available!`;
+                latestEl.style.color = "#ffbd2e";
+                updateBtn.classList.remove("hidden");
+            } else {
+                statusEl.style.color = "#27c93f";
+                statusEl.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align: middle; margin-right: 4px;"><polyline points="20 6 9 17 4 12"/></svg> Up to date`;
+                latestEl.style.color = "#27c93f";
+                updateBtn.classList.add("hidden");
+            }
+        } catch (e) {
+            currentEl.textContent = "Error";
+            latestEl.textContent = "Error";
+            statusEl.style.color = "var(--error)";
+            statusEl.textContent = "Failed to check version";
         }
-        const initialQuality = document.querySelector('input[name="quality"]:checked');
-        if (initialQuality) {
-            initialQuality.closest(".header-pill-btn")?.classList.add("active");
-        }
-        updateActiveQualityLabel();
     }
+    
+    document.getElementById("btnUpdateYtdlp")?.addEventListener("click", async () => {
+        const updateBtn = document.getElementById("btnUpdateYtdlp");
+        const statusEl = document.getElementById("ytdlpStatusText");
+        
+        updateBtn.disabled = true;
+        updateBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation: spin 0.8s infinite linear;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Updating...`;
+        statusEl.style.color = "var(--neon-blue)";
+        statusEl.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align: middle; margin-right: 4px; animation: spin 0.8s infinite linear;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Upgrading yt-dlp...`;
+        logToTerminal("[System] Upgrading yt-dlp to latest version...");
+        
+        try {
+            const res = await fetch("/api/ytdlp-update", { method: "POST" });
+            const data = await res.json();
+            
+            if (data.success) {
+                statusEl.style.color = "#27c93f";
+                statusEl.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align: middle; margin-right: 4px;"><polyline points="20 6 9 17 4 12"/></svg> Updated! Restart app to apply.`;
+                updateBtn.classList.add("hidden");
+                logToTerminal(`[System] yt-dlp upgraded successfully. ${data.message}`);
+            } else {
+                statusEl.style.color = "var(--error)";
+                statusEl.textContent = "Upgrade failed";
+                logToTerminal(`[Error] yt-dlp upgrade failed: ${data.message}`, true);
+                updateBtn.disabled = false;
+                updateBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Retry`;
+            }
+        } catch (e) {
+            statusEl.style.color = "var(--error)";
+            statusEl.textContent = "Network error during upgrade";
+            logToTerminal(`[Error] yt-dlp upgrade failed: ${e.message}`, true);
+            updateBtn.disabled = false;
+            updateBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Retry`;
+        }
+    });
 
-    // Startup shadow configuration checks
+    // Setup active states on startup radios
+    function shadowInputFix() {
+        const formatBtn = document.querySelector('input[name="format"]:checked')?.closest(".header-pill-btn");
+        if (formatBtn) formatBtn.classList.add("active");
+        const qualityBtn = document.querySelector('input[name="quality"]:checked')?.closest(".header-pill-btn");
+        if (qualityBtn) qualityBtn.classList.add("active");
+    }
+    
+    // Format selection change listener for auto quality selection
+    const formatRadios = document.querySelectorAll('input[name="format"]');
+    formatRadios.forEach(radio => {
+        radio.addEventListener("change", (e) => {
+            document.querySelectorAll('input[name="format"]').forEach(r => {
+                r.closest(".header-pill-btn")?.classList.remove("active");
+            });
+            if (e.target.checked) {
+                e.target.closest(".header-pill-btn")?.classList.add("active");
+                if (e.target.value === "audio") {
+                    const highestRadio = document.querySelector('input[name="quality"][value="highest"]');
+                    if (highestRadio && !highestRadio.checked) {
+                        highestRadio.checked = true;
+                        highestRadio.dispatchEvent(new Event("change"));
+                    }
+                }
+            }
+        });
+    });
+
+    const qualityRadios = document.querySelectorAll('input[name="quality"]');
+    qualityRadios.forEach(radio => {
+        radio.addEventListener("change", (e) => {
+            document.querySelectorAll('input[name="quality"]').forEach(r => {
+                r.closest(".header-pill-btn")?.classList.remove("active");
+            });
+            if (e.target.checked) {
+                e.target.closest(".header-pill-btn")?.classList.add("active");
+            }
+        });
+    });
+
     shadowInputFix();
 });

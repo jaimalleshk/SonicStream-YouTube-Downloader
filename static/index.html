@@ -19,30 +19,25 @@
     <div class="app-container">
         <!-- Header -->
         <header>
-            <div class="logo">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#logoGrad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="logo-icon">
-                    <defs>
-                        <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stop-color="var(--neon-blue)"/>
-                            <stop offset="100%" stop-color="var(--neon-pink)"/>
-                        </linearGradient>
-                    </defs>
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                </svg>
-                <span class="logo-text">SonicStream</span>
-                <span class="logo-badge">MVP</span>
+            <div class="logo-group" style="display: flex; flex-direction: column; gap: 0.15rem;">
+                <div class="logo" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="url(#logoGrad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="logo-icon">
+                        <defs>
+                            <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="var(--neon-blue)"/>
+                                <stop offset="100%" stop-color="var(--neon-pink)"/>
+                            </linearGradient>
+                        </defs>
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    </svg>
+                    <span class="logo-text" style="font-size: 1.35rem;">SonicStream</span>
+                    <span class="logo-badge" style="font-size: 0.65rem; padding: 0.05rem 0.4rem;">MVP</span>
+                    <span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600; margin-left: 0.25rem;">| High-Speed Media Downloader</span>
+                </div>
+                <p class="subtitle" style="margin: 0; font-size: 0.75rem; color: var(--text-secondary); text-align: left;">Extract playlists or single videos into premium audio or video formats instantly.</p>
             </div>
 
             <div class="header-actions" style="display: flex; align-items: center; gap: 0.75rem;">
-                <!-- Download Directory Inline Selector -->
-                <div class="header-directory-selector" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); padding: 0.35rem 0.75rem; border-radius: 8px;">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="flex-shrink: 0;">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                    </svg>
-                    <input type="text" id="downloadDirInput" style="background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 0.8rem; width: 230px; font-family: var(--font-sans); padding: 0;" placeholder="Loading path..." title="Download Location Path">
-                    <button id="browseDirBtn" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: var(--transition);">Browse</button>
-                </div>
-
                 <button class="btn btn-secondary open-folder-btn" id="historyBtn">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10"/>
@@ -50,184 +45,237 @@
                     </svg>
                     History
                 </button>
-                <button class="btn btn-secondary open-folder-btn" id="openFolderBtn">
+                <button class="btn btn-secondary open-folder-btn" id="btnOpenSettings" title="Settings">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                     </svg>
-                    Downloads
+                    Settings
                 </button>
             </div>
         </header>
 
         <!-- Main Content -->
         <main>
-            <!-- Hero / Input Panel -->
-            <section class="card hero-section">
-                <h1>High-Speed Media Downloader</h1>
-                <p class="subtitle">Extract playlists or single videos into premium audio or video formats instantly.</p>
-                
-                <!-- Format & Quality Settings inside Hero Card -->
-                <div class="hero-config-row" style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
-                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Format:</span>
-                    <div class="header-pill-group" style="display: flex; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px;">
-                        <label class="header-pill-btn active" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; color: var(--text-secondary); transition: var(--transition);">
-                            <input type="radio" name="format" value="audio" checked style="display: none;">
-                            Audio
-                        </label>
-                        <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; color: var(--text-secondary); transition: var(--transition);">
-                            <input type="radio" name="format" value="video" style="display: none;">
-                            Video
-                        </label>
-                    </div>
+            <!-- Hero / Input Panel (Compacted to two-column grid) -->
+            <section class="card hero-section" style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 1.5rem; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem;">
+                <!-- Left Column: URL input -->
+                <div style="display: flex; flex-direction: column; gap: 0.75rem; text-align: left; justify-content: center;">
 
-                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-left: 0.5rem;">Quality:</span>
-                    <div class="header-pill-group" style="display: flex; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px;">
-                        <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
-                            <input type="radio" name="quality" value="low" style="display: none;">
-                            Low
-                        </label>
-                        <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
-                            <input type="radio" name="quality" value="medium" style="display: none;">
-                            Med
-                        </label>
-                        <label class="header-pill-btn active" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
-                            <input type="radio" name="quality" value="high" checked style="display: none;">
-                            High
-                        </label>
-                        <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
-                            <input type="radio" name="quality" value="highest" style="display: none;">
-                            Max
-                        </label>
+                    <div class="input-group" style="display: flex; gap: 0.5rem; margin: 0; width: 100%;">
+                        <div class="input-wrapper" style="flex-grow: 1;">
+                            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="left: 0.85rem;">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            <input type="text" id="urlInput" placeholder="Paste YouTube Playlist or Video URL here..." autocomplete="off" style="padding: 0.55rem 0.75rem 0.55rem 2.25rem; font-size: 0.85rem; border-radius: 8px;">
+                        </div>
+                        <button class="btn btn-primary" id="analyzeBtn" style="padding: 0.55rem 1.25rem; font-size: 0.85rem; border-radius: 8px;">
+                            <span>Analyze Link</span>
+                            <div class="spinner hidden" id="analyzeSpinner" style="width: 14px; height: 14px; border-width: 1.5px;"></div>
+                        </button>
                     </div>
+                    <div id="urlError" class="error-msg hidden" style="margin-top: 0.25rem; font-size: 0.8rem;"></div>
                 </div>
 
-                <div class="input-group">
-                    <div class="input-wrapper">
-                        <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                        </svg>
-                        <input type="text" id="urlInput" placeholder="Paste YouTube Playlist or Video URL here..." autocomplete="off">
-                    </div>
-                    <button class="btn btn-primary" id="analyzeBtn">
-                        <span>Analyze Link</span>
-                        <div class="spinner hidden" id="analyzeSpinner"></div>
-                    </button>
-                </div>
-                <div id="urlError" class="error-msg hidden"></div>
-            </section>
-
-            <!-- Playlist/Video Items List -->
-            <section class="card playlist-section hidden" id="playlistSection">
-                <div class="playlist-header">
-                    <div>
-                        <h2 id="playlistTitle">YouTube Playlist</h2>
-                        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.25rem;">
-                            <p class="meta" id="playlistMeta" style="margin: 0;">0 items selected</p>
-                            <span style="color: var(--text-muted); font-size: 0.8rem;">|</span>
-                            <div id="activeQualityLabel" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">
-                                Active Selection: <span id="activeFormatText" style="color: var(--neon-blue);">Audio</span> (<span id="activeQualityText" style="color: var(--neon-purple);">High</span>)
+                <!-- Right Column: Universal Media Player Panel -->
+                <div id="playerControlsContainer" style="border: 1px solid var(--border-color); border-radius: 12px; display: flex; flex-direction: column; background: rgba(0,0,0,0.25); padding: 0.65rem; min-height: 120px; position: relative;">
+                    <!-- Video Output Element (Plays videos; hidden in audio mode) -->
+                    <video id="playerVideo" style="display: none; width: 100%; height: 90px; object-fit: contain; border-radius: 6px; background: #000; margin-bottom: 0.35rem;"></video>
+                    
+                    <!-- Audio Album Art / Equalizer Panel (Visible in audio mode) -->
+                    <div id="playerAudioArtPanel" style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.35rem; height: 90px;">
+                        <img id="playerTrackThumb" src="https://i.ytimg.com/vi/default/hqdefault.jpg" alt="Art" style="width: 120px; height: 90px; border-radius: 6px; object-fit: cover; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color);">
+                        <div style="display: flex; flex-direction: column; justify-content: center; flex-grow: 1; min-width: 0; text-align: left;">
+                            <div id="playerTrackTitle" style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Not Playing</div>
+                            <div id="playerTrackArtist" style="font-size: 0.7rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 0.1rem;">No Media Active</div>
+                            <div id="playerTrackStatus" style="font-size: 0.65rem; color: var(--neon-blue); font-weight: 600; margin-top: 0.25rem; display: flex; align-items: center; gap: 0.25rem;">
+                                <span class="equalizer-bar" style="width: 2px; height: 8px; background: var(--neon-blue); display: inline-block;"></span>
+                                Ready
                             </div>
                         </div>
                     </div>
-                    <div class="playlist-actions" style="display: flex; align-items: center; gap: 0.75rem;">
-                        <!-- Saving To Path Label -->
-                        <div style="display: flex; align-items: center; gap: 0.4rem; background: rgba(255, 255, 255, 0.01); border: 1px solid var(--border-color); padding: 0.4rem 0.8rem; border-radius: 8px; max-width: 280px; overflow: hidden;">
-                            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); text-overflow: ellipsis; white-space: nowrap; overflow: hidden;" id="lblSavingTo" title="Active download path">Saving to: --</span>
+                    
+                    <!-- Player Controls & Timers Row -->
+                    <div id="playerControlsRow" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                        <!-- Progress Slider -->
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span id="playerCurrentTime" style="font-size: 0.65rem; color: var(--text-muted);">00:00</span>
+                            <input type="range" id="playerProgressBar" min="0" max="100" value="0" style="flex-grow: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.1); outline: none; cursor: pointer; accent-color: var(--neon-blue);">
+                            <span id="playerTotalTime" style="font-size: 0.65rem; color: var(--text-muted);">00:00</span>
                         </div>
                         
-                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-right: 0.5rem; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); padding: 0.4rem 0.8rem; border-radius: 8px;">
-                            <input type="checkbox" id="skipDuplicatesCheckbox" checked style="cursor: pointer; width: 15px; height: 15px; border-radius: 4px; appearance: auto; -webkit-appearance: auto; accent-color: var(--neon-blue);">
-                            <label for="skipDuplicatesCheckbox" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none; margin-bottom: 0;">
-                                Skip duplicates
-                            </label>
+                        <!-- Control Buttons Row -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                            <div style="display: flex; gap: 0.65rem; align-items: center;">
+                                <button id="playerShuffleBtn" class="control-btn" style="background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 4px;" title="Shuffle Play">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 3h5v5M4 20l17-17M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+                                </button>
+                                <button id="playerPrevBtn" class="control-btn" style="background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 4px;" title="Previous Track">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+                                </button>
+                                <button id="playerPlayPauseBtn" style="background: var(--neon-blue); border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition); box-shadow: 0 0 10px rgba(0,242,254,0.5);" title="Play/Pause">
+                                    <svg id="playIconSvg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                </button>
+                                <button id="playerNextBtn" class="control-btn" style="background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 4px;" title="Next Track">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                                </button>
+                                <button id="playerRepeatBtn" class="control-btn" style="background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 4px;" title="Repeat Track">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 1l4 4-4 4M21 5H9a7 7 0 0 0-7 7v1M7 23l-4-4 4-4M3 19h12a7 7 0 0 0 7-7v-1"/></svg>
+                                </button>
+                            </div>
+                            
+                            <div style="display: flex; gap: 0.45rem; align-items: center;">
+                                <button id="playerVolumeBtn" style="background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 4px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                                </button>
+                                <input type="range" id="playerVolumeSlider" min="0" max="100" value="80" style="width: 60px; height: 3px; border-radius: 1.5px; background: rgba(255,255,255,0.1); cursor: pointer; accent-color: var(--neon-blue);">
+                                <button id="playerMaximizeBtn" style="background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 4px; margin-left: 0.35rem;" title="Toggle Fullscreen">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                                </button>
+                            </div>
                         </div>
-                        <button class="btn btn-secondary btn-sm" id="selectAllBtn">Select All</button>
-                        <button class="btn btn-secondary btn-sm" id="deselectAllBtn">Deselect All</button>
-                        <button class="btn btn-primary" id="downloadBtn">Download Selected</button>
                     </div>
-                </div>
-
-                <!-- Top HUD for progress updates -->
-                <div id="gridHud" class="grid-hud hidden" style="background: rgba(255, 255, 255, 0.01); border: 1px solid var(--border-color); border-radius: 12px; padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
-                    <div style="display: flex; align-items: center; gap: 0.75rem;">
-                        <div class="pulse-ring"></div>
-                        <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary);" id="hudJobTitle">Active Job: None</span>
-                    </div>
-                    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
-                        <div style="font-size: 0.85rem; color: var(--text-secondary);">
-                            Speed: <span id="hudSpeed" style="font-weight: 700; color: var(--neon-blue); font-family: var(--font-mono);">--</span>
-                        </div>
-                        <div style="font-size: 0.85rem; color: var(--text-secondary);">
-                            ETA: <span id="hudEta" style="font-weight: 700; color: var(--neon-blue); font-family: var(--font-mono);">--</span>
-                        </div>
-                        <div style="font-size: 0.85rem; color: var(--text-secondary);">
-                            Overall Progress: <span id="hudProgressCount" style="font-weight: 700; color: var(--neon-purple); font-family: var(--font-mono);">0 / 0 Completed</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="playlist-filters" style="display: flex; gap: 0.75rem; margin-bottom: 1.25rem;">
-                    <input type="text" id="playlistSearch" placeholder="Search title or channel..." style="flex-grow: 1; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); padding: 0.65rem 0.95rem; border-radius: 8px; color: var(--text-primary); font-size: 0.9rem;">
-                    <select id="statusFilter" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 0.65rem 1.25rem; border-radius: 8px; outline: none; font-weight: 600; cursor: pointer; font-size: 0.9rem;">
-                        <option value="all">All Statuses</option>
-                        <option value="queued">Queued</option>
-                        <option value="downloading">Downloading</option>
-                        <option value="completed">Completed (100%)</option>
-                        <option value="skipped">Skipped</option>
-                        <option value="error">Error</option>
-                    </select>
-                </div>
-
-                <div class="playlist-table-wrapper" style="overflow-x: auto;">
-                    <table class="playlist-table" style="min-width: 1300px;">
-                        <thead>
-                            <tr>
-                                <th width="40"><input type="checkbox" id="headerCheckbox"></th>
-                                <th width="60">Thumb</th>
-                                <th class="sortable" data-sort="title" style="cursor: pointer;">Title <span class="sort-icon" style="opacity: 0.5; font-size: 0.75rem;">↕</span></th>
-                                <th class="sortable" data-sort="uploader" width="160" style="cursor: pointer;">Channel <span class="sort-icon" style="opacity: 0.5; font-size: 0.75rem;">↕</span></th>
-                                <th class="sortable" data-sort="duration" width="90" style="cursor: pointer;">Duration <span class="sort-icon" style="opacity: 0.5; font-size: 0.75rem;">↕</span></th>
-                                <th class="sortable" data-sort="job_num" width="220" style="cursor: pointer;">Job # <span class="sort-icon" style="opacity: 0.5; font-size: 0.75rem;">↕</span></th>
-                                <th class="sortable" data-sort="status" width="180" style="cursor: pointer;">Status <span class="sort-icon" style="opacity: 0.5; font-size: 0.75rem;">↕</span></th>
-                                <th class="sortable" data-sort="speed" width="100" style="cursor: pointer;">Speed <span class="sort-icon" style="opacity: 0.5; font-size: 0.75rem;">↕</span></th>
-                                <th class="sortable" data-sort="start_time" width="100" style="cursor: pointer;">Start Time <span class="sort-icon" style="opacity: 0.5; font-size: 0.75rem;">↕</span></th>
-                                <th class="sortable" data-sort="end_time" width="100" style="cursor: pointer;">End Time <span class="sort-icon" style="opacity: 0.5; font-size: 0.75rem;">↕</span></th>
-                                <th class="sortable" data-sort="status_detail" width="120" style="cursor: pointer;">Status Detail <span class="sort-icon" style="opacity: 0.5; font-size: 0.75rem;">↕</span></th>
-                                <th class="sortable" data-sort="error_detail" width="150" style="cursor: pointer;">Error Detail <span class="sort-icon" style="opacity: 0.5; font-size: 0.75rem;">↕</span></th>
-                            </tr>
-                        </thead>
-                        <tbody id="playlistTableBody">
-                            <!-- Items inserted dynamically -->
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Pagination controls -->
-                <div id="paginationControls" class="pagination-controls" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem; padding: 0.5rem 0.25rem; border-top: 1px solid var(--border-color); padding-top: 1rem; flex-wrap: wrap; gap: 1rem;">
-                    <div style="font-size: 0.85rem; color: var(--text-secondary);">
-                        Showing <span id="paginationRange" style="font-weight: 700; color: var(--text-primary);">0 - 0</span> of <span id="paginationTotal" style="font-weight: 700; color: var(--text-primary);">0</span> items
-                    </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
-                        <button class="btn btn-secondary btn-sm" id="btnFirstPage" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;">First</button>
-                        <button class="btn btn-secondary btn-sm" id="btnPrevPage" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;">Prev</button>
-                        <span style="font-size: 0.85rem; color: var(--text-secondary); margin: 0 0.5rem; font-weight: 600;" id="pageIndicator">Page 1 of 1</span>
-                        <button class="btn btn-secondary btn-sm" id="btnNextPage" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;">Next</button>
-                        <button class="btn btn-secondary btn-sm" id="btnLastPage" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;">Last</button>
-                    </div>
-                </div>
-
-                <!-- Mini Console logs section inside the playlist card itself -->
-                <div class="terminal-logs" style="border: 1px solid var(--border-color); border-radius: 12px; background: #05070c; overflow: hidden; margin-top: 1.5rem;">
-                    <div class="terminal-header" style="background: #0f131a; padding: 0.45rem 0.9rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono); border-bottom: 1px solid var(--border-color);">
-                        <span>Console Output</span>
-                        <div class="mac-dots" style="display: flex; gap: 4px;"><span style="width:6px;height:6px;border-radius:50%;background:#ff5f56;"></span><span style="width:6px;height:6px;border-radius:50%;background:#ffbd2e;"></span><span style="width:6px;height:6px;border-radius:50%;background:#27c93f;"></span></div>
-                    </div>
-                    <div class="terminal-body" id="consoleLogs" style="padding: 0.85rem; height: 130px; overflow-y: auto; font-family: var(--font-mono); font-size: 0.75rem; color: #38bdf8; display: flex; flex-direction: column; gap: 0.35rem;">
-                        <p class="system-line">Ready...</p>
-                    </div>
+                    
                 </div>
             </section>
+
+            <!-- Dual Panel Dashboard -->
+            <div class="dashboard-layout" style="display: grid; grid-template-columns: 2.5fr 7.5fr; gap: 1.25rem; margin-top: 1.25rem;">
+                
+                <!-- Left Panel: Playlist Explorer (Sidebar) -->
+                <section class="card playlist-sidebar" style="display: flex; flex-direction: column; padding: 1rem; min-height: 480px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                        <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin: 0;">Playlists</h3>
+                        <button id="btnCreateManual" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-radius: 6px; display: flex; align-items: center; gap: 0.25rem;" title="Create Playlist from own folder">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            Create
+                        </button>
+                    </div>
+                    
+                    <!-- Pinned / All / Trash Tabs -->
+                    <div class="sidebar-tabs" style="display: flex; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px; margin-bottom: 0.75rem;">
+                        <button id="tabPinned" class="tab-btn active" style="flex: 1; border: none; background: transparent; color: var(--text-secondary); padding: 0.35rem; font-size: 0.75rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: var(--transition);">Pinned</button>
+                        <button id="tabAll" class="tab-btn" style="flex: 1; border: none; background: transparent; color: var(--text-secondary); padding: 0.35rem; font-size: 0.75rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: var(--transition);">All</button>
+                        <button id="tabTrash" class="tab-btn" style="flex: 1; border: none; background: transparent; color: var(--text-secondary); padding: 0.35rem; font-size: 0.75rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: var(--transition);">Trash</button>
+                    </div>
+                    
+                    <!-- Playlist Explorer List Box -->
+                    <div id="playlistListContainer" style="flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; max-height: 380px; padding-right: 4px;">
+                        <!-- Playlist Rows injected here -->
+                    </div>
+                    
+                    <!-- Sidebar Pagination Controls -->
+                    <div class="sidebar-pagination" style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 0.5rem; margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted);">
+                        <button id="sidebarPrevBtn" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 6px;">Prev</button>
+                        <span id="sidebarPageInfo">Page 1 of 1</span>
+                        <button id="sidebarNextBtn" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 6px;">Next</button>
+                    </div>
+                </section>
+                
+                <!-- Right Panel: Playlist Items Grid -->
+                <section class="card playlist-items-panel" id="playlistSection" style="display: flex; flex-direction: column; padding: 1.25rem;">
+                    <!-- Playlist Title Header & Actions -->
+                    <div class="playlist-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
+                        <div>
+                            <h2 id="playlistTitle" style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0;">No Playlist Selected</h2>
+                            <p id="playlistMetaInfo" style="margin: 0; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem;">Select a playlist from the left explorer or enter a link above.</p>
+                        </div>
+                        
+                        <!-- Grid Header Controls -->
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                            <!-- Sync/Refresh Playlist button -->
+                            <button id="refreshPlaylistBtn" class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px; display: flex; align-items: center; gap: 0.35rem;" title="Query YouTube for new uploads and download them">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                                </svg>
+                                Sync YouTube
+                            </button>
+                            
+                            <button id="selectAllBtn" class="btn btn-secondary btn-sm" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px;">Select All</button>
+                            <button id="deselectAllBtn" class="btn btn-secondary btn-sm" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px;">Deselect All</button>
+                            
+                            <button id="downloadBtn" class="btn btn-primary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px; display: flex; align-items: center; gap: 0.35rem;">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                                </svg>
+                                <span>Download Selected</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Top HUD for progress updates -->
+                    <div id="gridHud" class="grid-hud hidden" style="background: rgba(255, 255, 255, 0.01); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div class="pulse-ring" style="width: 8px; height: 8px;"></div>
+                            <span style="font-weight: 700; font-size: 0.8rem; color: var(--text-primary);" id="hudJobTitle">Active Job: None</span>
+                        </div>
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.75rem;">
+                            <div>Speed: <span id="hudSpeed" style="font-weight: 700; color: var(--neon-blue); font-family: var(--font-mono);">--</span></div>
+                            <div>ETA: <span id="hudEta" style="font-weight: 700; color: var(--neon-blue); font-family: var(--font-mono);">--</span></div>
+                            <div>Overall: <span id="hudProgressCount" style="font-weight: 700; color: var(--neon-purple); font-family: var(--font-mono);">0 / 0</span></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Table Search & Filter Bar -->
+                    <div class="table-filter-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; gap: 1rem;">
+                        <div style="display: flex; gap: 0.5rem; flex-grow: 1;">
+                            <input type="text" id="playlistSearch" placeholder="Search track title..." style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 0.75rem; padding: 0.35rem 0.65rem; width: 100%; max-width: 220px;">
+                            <select id="statusFilter" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 0.75rem; padding: 0.35rem 0.65rem; cursor: pointer;">
+                                <option value="all">All Tracks</option>
+                                <option value="completed">Completed</option>
+                                <option value="skipped">Skipped</option>
+                                <option value="error">Failed</option>
+                                <option value="queued">Queued</option>
+                                <option value="downloading">Downloading</option>
+                            </select>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">
+                            Selected: <span id="selectedCount" style="color: var(--neon-blue); font-weight: 600;">0</span>/<span id="totalCount">0</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Grid Table -->
+                    <div class="playlist-table-wrapper" style="flex-grow: 1; overflow-x: auto; max-height: 280px; border: 1px solid var(--border-color); border-radius: 8px;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.75rem; min-width: 900px;">
+                            <thead style="background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10;">
+                                <tr>
+                                    <th style="padding: 0.5rem; width: 30px;"><input type="checkbox" id="headerCheckbox"></th>
+                                    <th style="padding: 0.5rem; width: 40px;">#</th>
+                                    <th style="padding: 0.5rem; width: 60px;">Media</th>
+                                    <th style="padding: 0.5rem; width: 250px;">Title</th>
+                                    <th style="padding: 0.5rem; width: 100px; text-align: center;">Actions</th>
+                                    <th style="padding: 0.5rem; width: 160px;">Channel</th>
+                                    <th style="padding: 0.5rem; width: 80px;">Duration</th>
+                                    <th style="padding: 0.5rem; width: 150px;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="playlistTableBody">
+                                <!-- Track Rows injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Items Pagination Controls -->
+                    <div class="grid-pagination" id="paginationControls" style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 0.5rem; margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted);">
+                        <button id="btnPrevPage" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 6px;">Previous Page</button>
+                        <span id="pageIndicator">Page 1 of 1</span>
+                        <button id="btnNextPage" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 6px;">Next Page</button>
+                    </div>
+
+                    <!-- Mini Console logs section inside the playlist card itself -->
+                    <div class="terminal-logs" style="border: 1px solid var(--border-color); border-radius: 8px; background: #05070c; overflow: hidden; margin-top: 0.75rem;">
+                        <div class="terminal-header" style="background: #0f131a; padding: 0.3rem 0.6rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.65rem; color: var(--text-muted); font-family: var(--font-mono); border-bottom: 1px solid var(--border-color);">
+                            <span>Console Output</span>
+                            <div class="mac-dots" style="display: flex; gap: 4px;"><span style="width:5px;height:5px;border-radius:50%;background:#ff5f56;"></span><span style="width:5px;height:5px;border-radius:50%;background:#ffbd2e;"></span><span style="width:5px;height:5px;border-radius:50%;background:#27c93f;"></span></div>
+                        </div>
+                        <div class="terminal-body" id="consoleLogs" style="padding: 0.5rem; height: 80px; overflow-y: auto; font-family: var(--font-mono); font-size: 0.65rem; color: #38bdf8; display: flex; flex-direction: column; gap: 0.2rem;">
+                            <p class="system-line">Ready...</p>
+                        </div>
+                    </div>
+                </section>
+                
+            </div>
         </main>
     </div>
 
@@ -246,6 +294,18 @@
                         <option value="all">All Types</option>
                         <option value="playlist">Playlists</option>
                         <option value="single">Single Files</option>
+                    </select>
+                    <select id="historyFormatFilter" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 0.55rem 1rem; border-radius: 8px; outline: none; font-weight: 600; cursor: pointer; font-size: 0.85rem;">
+                        <option value="all">All Formats</option>
+                        <option value="audio">Audio</option>
+                        <option value="video">Video</option>
+                    </select>
+                    <select id="historyStatusFilter" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 0.55rem 1rem; border-radius: 8px; outline: none; font-weight: 600; cursor: pointer; font-size: 0.85rem;">
+                        <option value="all">All Results</option>
+                        <option value="completed">Completed</option>
+                        <option value="partial">Partial</option>
+                        <option value="failed">Failed</option>
+                        <option value="pending">Pending</option>
                     </select>
                 </div>
                 <div style="width: 100%; max-width: 100%; overflow-x: auto;">
@@ -269,13 +329,154 @@
                         </tbody>
                     </table>
                 </div>
+
+                <!-- History Pagination Controls -->
+                <div class="pagination-controls" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem; flex-wrap: wrap; gap: 0.75rem; background: rgba(0,0,0,0.15); padding: 0.75rem 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                        Showing <span id="historyPaginationRange" style="font-weight: 700; color: var(--text-primary);">0 - 0</span> of <span id="historyPaginationTotal" style="font-weight: 700; color: var(--neon-blue);">0</span> jobs
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <button class="btn btn-secondary btn-sm" id="btnHistoryFirstPage" style="padding: 0.35rem 0.65rem;">First</button>
+                        <button class="btn btn-secondary btn-sm" id="btnHistoryPrevPage" style="padding: 0.35rem 0.65rem;">Prev</button>
+                        <span id="historyPageIndicator" style="font-size: 0.85rem; color: var(--text-secondary); margin: 0 0.5rem; font-weight: 600;">Page 1 of 1</span>
+                        <button class="btn btn-secondary btn-sm" id="btnHistoryNextPage" style="padding: 0.35rem 0.65rem;">Next</button>
+                        <button class="btn btn-secondary btn-sm" id="btnHistoryLastPage" style="padding: 0.35rem 0.65rem;">Last</button>
+                    </div>
+                </div>
             </div>
 
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="closeHistoryModalBtn">Close</button>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal-overlay hidden">
+        <div class="modal" style="max-width: 480px;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--neon-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                    <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0;">Settings</h3>
+                </div>
+                <button id="btnCloseSettings" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.25rem; font-weight: bold; line-height: 1;">&times;</button>
+            </div>
+            
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 1.25rem; text-align: left; padding: 1.5rem;">
+                <!-- Section: Download Format & Quality -->
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--neon-blue); text-transform: uppercase; margin-bottom: 0.25rem;">Download Format & Quality</h4>
+                    
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem;">
+                        <span>Format:</span>
+                        <div class="header-pill-group" style="display: flex; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px;">
+                            <label class="header-pill-btn active" style="padding: 0.25rem 0.55rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; color: var(--text-secondary); transition: var(--transition);">
+                                <input type="radio" name="format" value="audio" checked style="display: none;">
+                                Audio
+                            </label>
+                            <label class="header-pill-btn" style="padding: 0.25rem 0.55rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; color: var(--text-secondary); transition: var(--transition);">
+                                <input type="radio" name="format" value="video" style="display: none;">
+                                Video
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; margin-top: 0.35rem;">
+                        <span>Quality Profile:</span>
+                        <div class="header-pill-group" style="display: flex; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px;">
+                            <label class="header-pill-btn" style="padding: 0.25rem 0.55rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
+                                <input type="radio" name="quality" value="low" style="display: none;">
+                                Low
+                            </label>
+                            <label class="header-pill-btn" style="padding: 0.25rem 0.55rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
+                                <input type="radio" name="quality" value="medium" style="display: none;">
+                                Med
+                            </label>
+                            <label class="header-pill-btn" style="padding: 0.25rem 0.55rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
+                                <input type="radio" name="quality" value="high" style="display: none;">
+                                High
+                            </label>
+                            <label class="header-pill-btn active" style="padding: 0.25rem 0.55rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
+                                <input type="radio" name="quality" value="highest" checked style="display: none;">
+                                Supreme
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0.25rem 0;">
+                
+                <!-- Section: Storage & Directory -->
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--neon-blue); text-transform: uppercase; margin-bottom: 0.25rem;">Storage Configuration</h4>
+                    <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                        <label style="font-size: 0.75rem; color: var(--text-secondary);">Download Location:</label>
+                        <div style="display: flex; gap: 0.5rem; width: 100%;">
+                            <input type="text" id="downloadDirInput" style="flex-grow: 1; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; padding: 0.4rem 0.60rem; font-size: 0.8rem; font-family: var(--font-sans);" placeholder="Loading path...">
+                            <button id="browseDirBtn" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.75rem; border-radius: 6px;">Browse</button>
+                        </div>
+                        <div style="margin-top: 0.25rem; display: flex; justify-content: flex-end;">
+                            <button id="openFolderBtn" class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px; display: flex; align-items: center; gap: 0.35rem;">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                                Open Folder
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0.25rem 0;">
+                
+                <!-- Section: Playback Behavior -->
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--neon-blue); text-transform: uppercase; margin-bottom: 0.25rem;">Playback Behavior</h4>
+                    
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem;">
+                        <span>Next Song Pause Delay:</span>
+                        <div style="display: flex; align-items: center; gap: 0.35rem;">
+                            <input type="number" id="playerPauseSeconds" value="5" min="0" max="300" style="width: 45px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 2px 4px; font-size: 0.8rem; text-align: center; font-family: var(--font-mono); outline: none;">
+                            <span>sec</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0.25rem 0;">
+                
+                <!-- Section: Engine Health -->
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--neon-blue); text-transform: uppercase; margin-bottom: 0.25rem;">Engine Health (yt-dlp)</h4>
+                    
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem;">
+                        <span>Installed Version:</span>
+                        <span id="ytdlpCurrentVersion" style="font-family: var(--font-mono); font-weight: 700; color: var(--text-primary);">Checking...</span>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem;">
+                        <span>Latest Available:</span>
+                        <span id="ytdlpLatestVersion" style="font-family: var(--font-mono); font-weight: 700; color: var(--text-muted);">Checking...</span>
+                    </div>
+                    
+                    <div id="ytdlpStatusRow" style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; margin-top: 0.25rem;">
+                        <span id="ytdlpStatusText" style="font-size: 0.75rem; color: #27c93f; font-weight: 600;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align: middle; margin-right: 4px;"><polyline points="20 6 9 17 4 12"/></svg>
+                            Checking...
+                        </span>
+                        <button id="btnUpdateYtdlp" class="btn btn-secondary hidden" style="padding: 0.3rem 0.65rem; font-size: 0.7rem; border-radius: 6px; display: flex; align-items: center; gap: 0.3rem;">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                            Update Now
+                        </button>
+                    </div>
+                    
+                    <p style="font-size: 0.65rem; color: var(--text-muted); margin: 0; line-height: 1.4;">
+                        YouTube changes its download protocols frequently. Keep yt-dlp updated to ensure downloads keep working. After updating, restart the app.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="modal-footer" style="padding: 1rem 1.5rem;">
+                <button class="btn btn-primary" id="btnSaveSettings" style="padding: 0.5rem 1.25rem; font-size: 0.8rem; border-radius: 8px;">Save & Close</button>
             </div>
         </div>
     </div>
-    <script src="/static/app.js?v=4"></script>
+    <script src="/static/app.js?v=5"></script>
 </body>
 </html>

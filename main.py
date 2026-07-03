@@ -12,7 +12,7 @@ from typing import List, Optional
 from urllib.parse import urlparse, parse_qs
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
 from pydantic import BaseModel
 import yt_dlp
 
@@ -20,7 +20,7 @@ app = FastAPI(title="YouTube Downloader")
 
 # Setup directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
+DOWNLOAD_DIR = r"D:\OneDrive - Triamber\YoutubeDownloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 os.makedirs(STATIC_DIR, exist_ok=True)
@@ -63,6 +63,9 @@ class DownloadItem(BaseModel):
     id: str
     title: str
     url: str
+    uploader: Optional[str] = "Unknown"
+    duration: Optional[int] = 0
+    thumbnail: Optional[str] = None
 
 class DownloadRequest(BaseModel):
     items: List[DownloadItem]
@@ -73,6 +76,32 @@ class DownloadRequest(BaseModel):
     skip_duplicates: Optional[bool] = True
     download_dir: Optional[str] = None
 
+class SaveItemsRequest(BaseModel):
+    items: List[DownloadItem]
+
+class LastPlayedRequest(BaseModel):
+    track_id: str
+    shuffle_mode: bool
+    shuffle_order: Optional[List[str]] = None
+    shuffle_index: Optional[int] = None
+
+class CreatePlaylistRequest(BaseModel):
+    title: str
+
+class ImportFolderRequest(BaseModel):
+    title: str
+    folder_path: str
+
+
+
+import re
+
+def clean_ansi(text: str) -> str:
+    if not text:
+        return ""
+    ansi_escape = re.compile(r'(?:\x1B[@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]')
+    return ansi_escape.sub('', text)
+
 # Helper: Sanitize windows filenames
 def sanitize_filename(filename: str) -> str:
     for char in ['\\', '/', ':', '*', '?', '"', '<', '>', '|']:
@@ -82,18 +111,22 @@ def sanitize_filename(filename: str) -> str:
 
 def check_local_duplicate(title: str, format_type: str, download_dir: str) -> Optional[str]:
     target_exts = [".mp3"] if format_type == "audio" else [".mp4", ".mkv", ".webm"]
-    sanitized_title = title
-    for char in ['\\', '/', ':', '*', '?', '"', '<', '>', '|']:
-        sanitized_title = sanitized_title.replace(char, '_')
-    sanitized_title = sanitized_title.rstrip('. ')
     
+    def clean_fuzzy(s: str) -> str:
+        return "".join(c.lower() for c in s if c.isalnum())
+        
+    fuzzy_title = clean_fuzzy(title)
+    if not fuzzy_title:
+        return None
+        
     try:
         if os.path.exists(download_dir):
             files = os.listdir(download_dir)
             for f in files:
                 name, ext = os.path.splitext(f)
-                if name.lower() == sanitized_title.lower() and ext.lower() in target_exts:
-                    return os.path.join(download_dir, f)
+                if ext.lower() in target_exts:
+                    if clean_fuzzy(name) == fuzzy_title:
+                        return os.path.join(download_dir, f)
     except Exception:
         pass
     return None
@@ -115,20 +148,111 @@ def save_history(history):
     except Exception:
         pass
 
-def update_history_counts(job_id: str, success: int, failures: int):
+def update_history_track_status(job_id: str, track_id: str, status: str, percentage: float, speed: str = "--", start_time: str = None, end_time: str = None, error_detail: str = ""):
     with history_lock:
         history = load_history()
-        for item in history:
-            if item.get("id") == job_id:
-                item["success_count"] = success
-                item["failure_count"] = failures
-                item["completed_tracks"] = success + failures
+        for job in history:
+            if job.get("id") == job_id:
+                items = job.get("items", [])
+                for track in items:
+                    if track.get("id") == track_id:
+                        track["status"] = status
+                        track["percentage"] = percentage
+                        if speed != "--":
+                            track["speed"] = speed
+                        if start_time:
+                            track["start_time"] = start_time
+                        if end_time:
+                            track["end_time"] = end_time
+                        if error_detail is not None:
+                            track["error_detail"] = error_detail
+                        break
+                
+                # Recompute job counts
+                success = sum(1 for t in items if t.get("status") in ["completed", "skipped"])
+                failures = sum(1 for t in items if t.get("status") == "error")
+                job["success_count"] = success
+                job["failure_count"] = failures
+                job["completed_tracks"] = success + failures
                 break
         save_history(history)
 
 @app.get("/")
 async def read_index():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
+# yt-dlp version check and self-update endpoints
+@app.get("/api/ytdlp-version")
+async def get_ytdlp_version():
+    """Return current installed yt-dlp version and check for updates."""
+    current_version = yt_dlp.version.__version__
+    update_available = False
+    latest_version = current_version
+
+    try:
+        # Use yt-dlp's own update check (quick network call)
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, _check_ytdlp_latest)
+        if result and result != current_version:
+            latest_version = result
+            update_available = True
+    except Exception:
+        pass  # Silently fail; we still return the current version
+
+    return {
+        "current_version": current_version,
+        "latest_version": latest_version,
+        "update_available": update_available
+    }
+
+def _check_ytdlp_latest():
+    """Check PyPI for the latest yt-dlp release version."""
+    try:
+        import urllib.request
+        url = "https://pypi.org/pypi/yt-dlp/json"
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+            return data.get("info", {}).get("version", "")
+    except Exception:
+        return None
+
+@app.post("/api/ytdlp-update")
+async def update_ytdlp():
+    """Upgrade yt-dlp to the latest version using pip."""
+    try:
+        python_exe = sys.executable
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, lambda: subprocess.run(
+            [python_exe, "-m", "pip", "install", "--upgrade", "yt-dlp"],
+            capture_output=True, text=True, timeout=120
+        ))
+        
+        if result.returncode == 0:
+            # Re-read the version after upgrade
+            new_version = "unknown"
+            for line in result.stdout.splitlines():
+                if "Successfully installed yt-dlp" in line:
+                    parts = line.split("yt-dlp-")
+                    if len(parts) > 1:
+                        new_version = parts[-1].strip()
+                        break
+            
+            return {
+                "success": True,
+                "message": "yt-dlp upgraded successfully. Restart the app to use the new version.",
+                "output": result.stdout[-500:] if len(result.stdout) > 500 else result.stdout,
+                "new_version": new_version
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"Upgrade failed: {result.stderr[-300:] if result.stderr else 'Unknown error'}"
+            }
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Upgrade timed out after 120 seconds.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 def get_clean_playlist_url(url: str) -> str:
     try:
@@ -154,6 +278,8 @@ async def fetch_info(req: FetchRequest):
         'skip_download': True,
         'quiet': True,
         'no_warnings': True,
+        'socket_timeout': 15,
+        'no_interactive': True,
     }
 
     try:
@@ -265,11 +391,22 @@ def run_download_job(job_data: dict):
             download_state["current_index"] = idx + 1
             download_state["current_title"] = item.title
             download_state["percentage"] = 0.0
+            download_state["speed"] = "0 KB/s"
+            download_state["eta"] = "00:00"
             download_state["logs"].append(f"[{idx+1}/{len(request.items)}] Preparing: {item.title}")
             download_state["item_states"][item.id].update({
                 "status": "downloading",
+                "percentage": 0.0,
+                "speed": "0 KB/s",
                 "start_time": datetime.now().strftime("%H:%M:%S")
             })
+        update_history_track_status(
+            job_id=job_id,
+            track_id=item.id,
+            status="downloading",
+            percentage=0.0,
+            start_time=datetime.now().strftime("%H:%M:%S")
+        )
 
         def progress_hook(d):
             global download_state
@@ -280,7 +417,9 @@ def run_download_job(job_data: dict):
                 
                 # Robust speed extraction and fallback
                 speed = d.get('_speed_str')
-                if not speed:
+                if speed:
+                    speed = clean_ansi(speed)
+                else:
                     speed_bytes = d.get('speed')
                     if speed_bytes is not None:
                         if speed_bytes > 1024 * 1024:
@@ -295,7 +434,9 @@ def run_download_job(job_data: dict):
 
                 # Robust ETA extraction and fallback
                 eta = d.get('_eta_str')
-                if not eta:
+                if eta:
+                    eta = clean_ansi(eta)
+                else:
                     eta_val = d.get('eta')
                     if eta_val is not None:
                         mins = int(eta_val // 60)
@@ -321,6 +462,27 @@ def run_download_job(job_data: dict):
                     download_state["percentage"] = 100.0
                     download_state["logs"].append(f"Finished downloading: {title}")
 
+        def pp_hook(d):
+            global download_state
+            if d['status'] == 'started':
+                pp_name = d.get('postprocessor', 'Post-processor')
+                msg = f"Post-processing: Running {pp_name} (this can take a few minutes for long tracks)..."
+                with progress_lock:
+                    download_state["percentage"] = 100.0
+                    download_state["speed"] = "Processing..."
+                    download_state["eta"] = "Running..."
+                    download_state["logs"].append(msg)
+                    if item.id in download_state["item_states"]:
+                        download_state["item_states"][item.id].update({
+                            "status": "downloading",
+                            "percentage": 100.0,
+                            "speed": "Processing..."
+                        })
+            elif d['status'] == 'finished':
+                with progress_lock:
+                    download_state["speed"] = "Finishing..."
+                    download_state["eta"] = "Finishing..."
+
         # Check for local duplicates first
         duplicate_path = check_local_duplicate(item.title, request.format, target_dir)
         
@@ -336,7 +498,13 @@ def run_download_job(job_data: dict):
                         "end_time": datetime.now().strftime("%H:%M:%S")
                     })
             success_count += 1
-            update_history_counts(job_id, success_count, failure_count)
+            update_history_track_status(
+                job_id=job_id,
+                track_id=item.id,
+                status="skipped",
+                percentage=100.0,
+                end_time=datetime.now().strftime("%H:%M:%S")
+            )
             continue
 
         # Quality and format resolution
@@ -344,11 +512,19 @@ def run_download_job(job_data: dict):
             'quiet': True,
             'no_warnings': True,
             'progress_hooks': [progress_hook],
+            'postprocessor_hooks': [pp_hook],
             'outtmpl': os.path.join(target_dir, '%(title)s.%(ext)s'),
             'download_archive': os.path.join(target_dir, 'download_archive.txt'),
             'nooverwrites': True,
             'noplaylist': True,
             'writethumbnail': True,
+            'socket_timeout': 15,
+            'retries': 3,
+            'fragment_retries': 3,
+            'no_interactive': True,
+            'postprocessor_args': {
+                'ffmpeg': ['-y'],
+            },
         }
 
         if request.format == "audio":
@@ -406,6 +582,8 @@ def run_download_job(job_data: dict):
                 success = True
                 break
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 error_msg = str(e)
                 if attempt < max_retries - 1:
                     with progress_lock:
@@ -423,7 +601,13 @@ def run_download_job(job_data: dict):
                         "end_time": datetime.now().strftime("%H:%M:%S")
                     })
             success_count += 1
-            update_history_counts(job_id, success_count, failure_count)
+            update_history_track_status(
+                job_id=job_id,
+                track_id=item.id,
+                status="completed",
+                percentage=100.0,
+                end_time=datetime.now().strftime("%H:%M:%S")
+            )
         else:
             error_str = f"Error downloading {item.title} after {max_retries} attempts: {error_msg}"
             with progress_lock:
@@ -435,7 +619,14 @@ def run_download_job(job_data: dict):
                         "error_detail": error_msg
                     })
             failure_count += 1
-            update_history_counts(job_id, success_count, failure_count)
+            update_history_track_status(
+                job_id=job_id,
+                track_id=item.id,
+                status="error",
+                percentage=0.0,
+                end_time=datetime.now().strftime("%H:%M:%S"),
+                error_detail=error_msg
+            )
 
     with progress_lock:
         download_state["status"] = "completed"
@@ -479,36 +670,118 @@ async def start_download(req: DownloadRequest):
 
     with history_lock:
         history = load_history()
-        max_job_num = 0
-        for h_item in history:
-            if "job_num" in h_item:
-                max_job_num = max(max_job_num, h_item["job_num"])
-        new_job_num = max_job_num + 1
+        
+        # Check for existing job with the same URL (excluding empty URLs)
+        existing_job = None
+        if url:
+            for job in history:
+                if job.get("url") == url:
+                    existing_job = job
+                    break
+        
+        if existing_job:
+            # Reuse existing job
+            job_id = existing_job["id"]
+            new_job_num = existing_job["job_num"]
+            title = existing_job["title"]
+            
+            # Find and append delta tracks or resume incomplete ones
+            existing_items_map = {it["id"]: it for it in existing_job.get("items", [])}
+            delta_items = []
+            for item in req.items:
+                if item.id not in existing_items_map:
+                    new_item_dict = {
+                        "id": item.id,
+                        "title": item.title,
+                        "uploader": item.uploader or "Unknown",
+                        "duration": item.duration or 0,
+                        "thumbnail": item.thumbnail,
+                        "url": item.url,
+                        "status": "queued",
+                        "percentage": 0.0,
+                        "speed": "--",
+                        "start_time": "--",
+                        "end_time": "--",
+                        "error_detail": ""
+                    }
+                    existing_job.setdefault("items", []).append(new_item_dict)
+                    delta_items.append(item)
+                else:
+                    existing_track = existing_items_map[item.id]
+                    if existing_track.get("status") not in ["completed", "skipped"]:
+                        # Reset to queued state to download it
+                        existing_track["status"] = "queued"
+                        existing_track["percentage"] = 0.0
+                        existing_track["speed"] = "--"
+                        existing_track["start_time"] = "--"
+                        existing_track["end_time"] = "--"
+                        existing_track["error_detail"] = ""
+                        delta_items.append(item)
+            
+            existing_job["total_tracks"] = len(existing_job["items"])
+            existing_job["format"] = req.format
+            existing_job["quality"] = req.quality
+            save_history(history)
+            
+            # Queue only delta items for downloading
+            import copy
+            req_queued = copy.copy(req)
+            req_queued.items = delta_items
+        else:
+            # Create a brand new job entry
+            max_job_num = 0
+            for h_item in history:
+                if "job_num" in h_item:
+                    max_job_num = max(max_job_num, h_item["job_num"])
+            new_job_num = max_job_num + 1
+            
+            new_entry = {
+                "id": job_id,
+                "job_num": new_job_num,
+                "title": title,
+                "url": url,
+                "timestamp": timestamp,
+                "total_tracks": len(req.items),
+                "completed_tracks": 0,
+                "success_count": 0,
+                "failure_count": 0,
+                "is_playlist": len(req.items) > 1 or req.playlist_url is not None,
+                "format": req.format,
+                "quality": req.quality,
+                "download_dir": target_dir,
+                "pinned": False,
+                "items": [
+                    {
+                        "id": item.id,
+                        "title": item.title,
+                        "uploader": item.uploader or "Unknown",
+                        "duration": item.duration or 0,
+                        "thumbnail": item.thumbnail,
+                        "url": item.url,
+                        "status": "queued",
+                        "percentage": 0.0,
+                        "speed": "--",
+                        "start_time": "--",
+                        "end_time": "--",
+                        "error_detail": ""
+                    }
+                    for item in req.items
+                ]
+            }
+            history.insert(0, new_entry)
+            save_history(history)
+            req_queued = req
 
-        new_entry = {
-            "id": job_id,
-            "job_num": new_job_num,
-            "title": title,
-            "url": url,
-            "timestamp": timestamp,
-            "total_tracks": len(req.items),
-            "completed_tracks": 0,
-            "success_count": 0,
-            "failure_count": 0,
-            "is_playlist": len(req.items) > 1 or req.playlist_url is not None,
-            "format": req.format,
-            "quality": req.quality,
-            "download_dir": target_dir
-        }
-        history.insert(0, new_entry)
-        save_history(history)
+    # Sort items so that shorter tracks are downloaded first, and larger/longer tracks are downloaded last!
+    if req_queued.items:
+        req_queued.items.sort(key=lambda x: x.duration or 0)
 
     # Push to task queue
     job_data = {
         "job_id": job_id,
         "job_num": new_job_num,
         "title": title,
-        "request": req
+        "request": req_queued
     }
     
     with queue_lock:
@@ -579,7 +852,67 @@ async def get_progress_stream():
 @app.get("/api/history")
 async def get_history():
     with history_lock:
-        return load_history()
+        history = load_history()
+        
+        # 1. Compute union of all completed/skipped tracks for "All Downloads"
+        unique_tracks = {}
+        for job in history:
+            if job.get("deleted") or job.get("id") == "deleted_tracks":
+                continue
+            for item in job.get("items", []):
+                if item.get("status") in ["completed", "skipped"]:
+                    track_id = item.get("id")
+                    if track_id not in unique_tracks:
+                        copied = dict(item)
+                        copied["status"] = "completed"
+                        copied["percentage"] = 100.0
+                        unique_tracks[track_id] = copied
+                        
+        all_downloads_job = {
+            "id": "all_downloads",
+            "job_num": 0,
+            "title": "All Downloads",
+            "url": "",
+            "format": "audio",
+            "quality": "highest",
+            "items": list(unique_tracks.values()),
+            "total_tracks": len(unique_tracks),
+            "success_count": len(unique_tracks),
+            "failure_count": 0,
+            "completed_tracks": len(unique_tracks),
+            "pinned": False,
+            "deleted": False,
+            "is_virtual": True
+        }
+        
+        # 2. Find or synthesize "Deleted Tracks"
+        deleted_tracks_job = None
+        for job in history:
+            if job.get("id") == "deleted_tracks":
+                deleted_tracks_job = job
+                break
+                
+        if not deleted_tracks_job:
+            deleted_tracks_job = {
+                "id": "deleted_tracks",
+                "job_num": 0,
+                "title": "Deleted Tracks",
+                "url": "",
+                "format": "audio",
+                "quality": "highest",
+                "items": [],
+                "total_tracks": 0,
+                "success_count": 0,
+                "failure_count": 0,
+                "completed_tracks": 0,
+                "pinned": False,
+                "deleted": False,
+                "is_virtual": True
+            }
+            history.append(deleted_tracks_job)
+            save_history(history)
+            
+        return [all_downloads_job] + history
 
 @app.post("/api/history/clear")
 async def clear_history():
@@ -609,15 +942,17 @@ async def resume_job(req: ResumeRequest):
     url = job.get("url")
     if not url:
         raise HTTPException(status_code=400, detail="Job does not have a URL associated")
-
+    url = get_clean_playlist_url(url)
     original_dir = job.get("download_dir", DOWNLOAD_DIR)
 
-    # 2. Extract playlist entries
+    # 2. Extract playlist entries from YouTube
     ydl_opts = {
         'extract_flat': True,
         'skip_download': True,
         'quiet': True,
         'no_warnings': True,
+        'socket_timeout': 15,
+        'no_interactive': True,
     }
     
     try:
@@ -630,7 +965,6 @@ async def resume_job(req: ResumeRequest):
             
         entries = []
         is_playlist = info.get('_type') == 'playlist'
-        
         raw_items = info.get('entries', []) if is_playlist else [info]
         for entry in raw_items:
             if not entry:
@@ -638,58 +972,119 @@ async def resume_job(req: ResumeRequest):
             video_id = entry.get('id') or entry.get('url')
             if not video_id:
                 continue
+            entry_title = entry.get('title') or "Unknown Title"
+            entry_url = f"https://www.youtube.com/watch?v={video_id}" if is_playlist else url
+            entry_uploader = entry.get('uploader') or entry.get('channel') or "Unknown"
+            entry_duration = entry.get('duration') or 0
+            entry_thumb = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg" if is_playlist else entry.get('thumbnail')
             entries.append(DownloadItem(
                 id=video_id,
-                title=entry.get('title') or "Unknown Title",
-                url=f"https://www.youtube.com/watch?v={video_id}" if is_playlist else url
+                title=entry_title,
+                url=entry_url,
+                uploader=entry_uploader,
+                duration=entry_duration,
+                thumbnail=entry_thumb
             ))
             
-        # 3. Create the DownloadRequest
+        # 3. Update existing job items state in history
+        with history_lock:
+            history = load_history()
+            target_job = None
+            for item in history:
+                if item.get("id") == req.job_id:
+                    target_job = item
+                    break
+                    
+            if not target_job:
+                raise HTTPException(status_code=404, detail="Job not found")
+
+            # Populates items list if it was missing (fallback for old items)
+            if not target_job.get("items"):
+                target_job["items"] = [
+                    {
+                        "id": item.id,
+                        "title": item.title,
+                        "uploader": item.uploader or "Unknown",
+                        "duration": item.duration or 0,
+                        "thumbnail": item.thumbnail,
+                        "url": item.url,
+                        "status": "queued",
+                        "percentage": 0.0,
+                        "speed": "--",
+                        "start_time": "--",
+                        "end_time": "--",
+                        "error_detail": ""
+                    }
+                    for item in entries
+                ]
+            else:
+                # Merge any newly discovered items
+                existing_ids = {it["id"] for it in target_job["items"]}
+                for item in entries:
+                    if item.id not in existing_ids:
+                        target_job["items"].append({
+                            "id": item.id,
+                            "title": item.title,
+                            "uploader": item.uploader or "Unknown",
+                            "duration": item.duration or 0,
+                            "thumbnail": item.thumbnail,
+                            "url": item.url,
+                            "status": "queued",
+                            "percentage": 0.0,
+                            "speed": "--",
+                            "start_time": "--",
+                            "end_time": "--",
+                            "error_detail": ""
+                        })
+
+            # Reset status of items that need downloading
+            tracks_to_download = []
+            for track in target_job["items"]:
+                is_done = track.get("status") in ["completed", "skipped"]
+                if req.force_all or not is_done:
+                    track["status"] = "queued"
+                    track["percentage"] = 0.0
+                    track["speed"] = "--"
+                    track["start_time"] = "--"
+                    track["end_time"] = "--"
+                    track["error_detail"] = ""
+                    
+                    tracks_to_download.append(DownloadItem(
+                        id=track["id"],
+                        title=track["title"],
+                        url=track["url"],
+                        uploader=track["uploader"],
+                        duration=track["duration"],
+                        thumbnail=track["thumbnail"]
+                    ))
+
+            target_job["total_tracks"] = len(target_job["items"])
+            save_history(history)
+            
+            job_id = target_job["id"]
+            job_num = target_job["job_num"]
+            title = target_job["title"]
+            frontend_entries = target_job["items"]
+
+        # Sort items so that shorter tracks are downloaded first, and larger/longer tracks are downloaded last!
+        if tracks_to_download:
+            tracks_to_download.sort(key=lambda x: x.duration or 0)
+
+        # 4. Queue download
         dl_req = DownloadRequest(
-            items=entries,
+            items=tracks_to_download,
             format=job.get("format", "audio"),
             quality=job.get("quality", "highest"),
-            playlist_title=job.get("title"),
+            playlist_title=title,
             playlist_url=url,
             skip_duplicates=not req.force_all,
             download_dir=original_dir
         )
         
-        # 4. Trigger download (push to queue)
-        job_id = f"job_{int(time.time())}"
-        display_title = f"[Forced] {job.get('title')}" if req.force_all else f"[Resumed] {job.get('title')}"
-        
-        with history_lock:
-            history = load_history()
-            max_job_num = 0
-            for h_item in history:
-                if "job_num" in h_item:
-                    max_job_num = max(max_job_num, h_item["job_num"])
-            new_job_num = max_job_num + 1
-            
-            # Insert a new entry so they see the resumption attempt history
-            new_entry = {
-                "id": job_id,
-                "job_num": new_job_num,
-                "title": display_title,
-                "url": url,
-                "timestamp": datetime.now().isoformat(),
-                "total_tracks": len(entries),
-                "completed_tracks": 0,
-                "success_count": 0,
-                "failure_count": 0,
-                "is_playlist": job.get("is_playlist", len(entries) > 1),
-                "format": job.get("format", "audio"),
-                "quality": job.get("quality", "highest"),
-                "download_dir": original_dir
-            }
-            history.insert(0, new_entry)
-            save_history(history)
-            
         job_data = {
             "job_id": job_id,
-            "job_num": new_job_num,
-            "title": display_title,
+            "job_num": job_num,
+            "title": title,
             "request": dl_req
         }
         
@@ -697,7 +1092,7 @@ async def resume_job(req: ResumeRequest):
             queue_state["pending_jobs"].append(job_data)
             
         download_queue.put(job_data)
-        return {"message": "Job resumed and queued", "job_id": job_id, "job_num": new_job_num}
+        return {"message": "Job resumed and queued", "job_id": job_id, "job_num": job_num, "title": title, "url": url, "entries": frontend_entries}
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Resumption failed: {str(e)}")
@@ -765,6 +1160,543 @@ async def browse_dir():
         return {"download_dir": None}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to open browse dialog: {str(e)}")
+
+@app.post("/api/history/{job_id}/pin")
+async def pin_job(job_id: str):
+    with history_lock:
+        history = load_history()
+        found = False
+        pinned_state = False
+        for job in history:
+            if job.get("id") == job_id:
+                job["pinned"] = not job.get("pinned", False)
+                pinned_state = job["pinned"]
+                found = True
+                break
+        if not found:
+            raise HTTPException(status_code=404, detail="Job not found")
+        save_history(history)
+    return {"message": "Job pin status toggled", "pinned": pinned_state}
+
+@app.delete("/api/history/{job_id}")
+async def delete_job(job_id: str):
+    with history_lock:
+        history = load_history()
+        found = False
+        for job in history:
+            if job.get("id") == job_id:
+                if job.get("deleted"):
+                    # Already soft-deleted: delete PERMANENTLY!
+                    history.remove(job)
+                else:
+                    # Soft delete!
+                    job["deleted"] = True
+                found = True
+                break
+        if not found:
+            raise HTTPException(status_code=404, detail="Job not found")
+        save_history(history)
+    return {"message": "Job deleted successfully"}
+
+@app.post("/api/history/{job_id}/restore")
+async def restore_job(job_id: str):
+    with history_lock:
+        history = load_history()
+        found = False
+        for job in history:
+            if job.get("id") == job_id:
+                job["deleted"] = False
+                found = True
+                break
+        if not found:
+            raise HTTPException(status_code=404, detail="Job not found")
+        save_history(history)
+    return {"message": "Playlist restored successfully"}
+
+@app.post("/api/playlists/create")
+async def create_playlist(req: CreatePlaylistRequest):
+    with history_lock:
+        history = load_history()
+        job_id = f"manual_{int(time.time())}"
+        
+        max_num = 0
+        for job in history:
+            if "job_num" in job:
+                max_num = max(max_num, job["job_num"])
+                
+        new_job = {
+            "id": job_id,
+            "job_num": max_num + 1,
+            "title": req.title,
+            "url": "",
+            "format": "audio",
+            "quality": "highest",
+            "items": [],
+            "total_tracks": 0,
+            "success_count": 0,
+            "failure_count": 0,
+            "completed_tracks": 0,
+            "pinned": False,
+            "deleted": False
+        }
+        history.insert(0, new_job)
+        save_history(history)
+    return new_job
+
+@app.post("/api/playlists/import")
+async def import_playlist(req: ImportFolderRequest):
+    if not os.path.exists(req.folder_path):
+        raise HTTPException(status_code=400, detail="Folder path does not exist")
+        
+    audio_exts = [".mp3", ".m4a", ".mp4", ".wav", ".webm", ".aac"]
+    items = []
+    
+    try:
+        for filename in os.listdir(req.folder_path):
+            name, ext = os.path.splitext(filename)
+            if ext.lower() in audio_exts:
+                file_path = os.path.join(req.folder_path, filename)
+                item_id = f"local_{abs(hash(file_path))}"
+                items.append({
+                    "id": item_id,
+                    "title": name,
+                    "uploader": "Local Folder",
+                    "duration": 0,
+                    "thumbnail": "https://i.ytimg.com/vi/default/hqdefault.jpg",
+                    "url": file_path,
+                    "status": "completed",
+                    "percentage": 100.0,
+                    "speed": "--",
+                    "start_time": "--",
+                    "end_time": "--",
+                    "error_detail": ""
+                })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to scan folder: {str(e)}")
+        
+    if len(items) == 0:
+        raise HTTPException(status_code=400, detail="No audio/video files found in selected folder")
+        
+    with history_lock:
+        history = load_history()
+        job_id = f"manual_{int(time.time())}"
+        max_num = 0
+        for job in history:
+            if "job_num" in job:
+                max_num = max(max_num, job["job_num"])
+                
+        new_job = {
+            "id": job_id,
+            "job_num": max_num + 1,
+            "title": req.title,
+            "url": "",
+            "format": "audio",
+            "quality": "highest",
+            "items": items,
+            "total_tracks": len(items),
+            "success_count": len(items),
+            "failure_count": 0,
+            "completed_tracks": len(items),
+            "pinned": False,
+            "deleted": False
+        }
+        history.insert(0, new_job)
+        save_history(history)
+    return new_job
+
+@app.post("/api/settings/browse-folder")
+async def browse_folder():
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        
+        folder = filedialog.askdirectory(title="Select Folder to Import")
+        root.destroy()
+        
+        if folder:
+            folder = os.path.normpath(folder)
+            return {"folder_path": folder}
+        return {"folder_path": None}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to open browse dialog: {str(e)}")
+
+@app.post("/api/playlists/{job_id}/add-track")
+async def add_track(job_id: str, item: DownloadItem):
+    with history_lock:
+        history = load_history()
+        found = False
+        for job in history:
+            if job.get("id") == job_id:
+                target_dir = job.get("download_dir", DOWNLOAD_DIR)
+                local_path = check_local_duplicate(item.title, job.get("format", "audio"), target_dir)
+                status = "completed" if local_path and os.path.exists(local_path) else "queued"
+                
+                new_item = {
+                    "id": item.id,
+                    "title": item.title,
+                    "uploader": item.uploader or "Unknown",
+                    "duration": item.duration or 0,
+                    "thumbnail": item.thumbnail,
+                    "url": item.url,
+                    "status": status,
+                    "percentage": 100.0 if status == "completed" else 0.0,
+                    "speed": "--",
+                    "start_time": "--",
+                    "end_time": "--",
+                    "error_detail": ""
+                }
+                
+                job.setdefault("items", []).append(new_item)
+                job["total_tracks"] = len(job["items"])
+                
+                success = sum(1 for t in job["items"] if t.get("status") in ["completed", "skipped"])
+                job["success_count"] = success
+                job["completed_tracks"] = success
+                found = True
+                break
+                
+        if not found:
+            raise HTTPException(status_code=404, detail="Playlist not found")
+        save_history(history)
+    return {"message": "Track added successfully"}
+
+@app.delete("/api/history/{job_id}/tracks/{track_id}")
+async def delete_track(job_id: str, track_id: str):
+    with history_lock:
+        history = load_history()
+        track_to_delete = None
+        
+        for job in history:
+            if job.get("id") == job_id:
+                items = job.get("items", [])
+                for track in items:
+                    if track.get("id") == track_id:
+                        track_to_delete = dict(track)
+                        items.remove(track)
+                        break
+                job["total_tracks"] = len(items)
+                success = sum(1 for t in items if t.get("status") in ["completed", "skipped"])
+                job["success_count"] = success
+                job["completed_tracks"] = success
+                break
+                
+        if not track_to_delete:
+            raise HTTPException(status_code=404, detail="Track not found in playlist")
+            
+        deleted_playlist = None
+        for job in history:
+            if job.get("id") == "deleted_tracks":
+                deleted_playlist = job
+                break
+                
+        if not deleted_playlist:
+            deleted_playlist = {
+                "id": "deleted_tracks",
+                "job_num": 0,
+                "title": "Deleted Tracks",
+                "url": "",
+                "format": "audio",
+                "quality": "highest",
+                "items": [],
+                "total_tracks": 0,
+                "success_count": 0,
+                "failure_count": 0,
+                "completed_tracks": 0,
+                "pinned": False,
+                "deleted": False
+            }
+            history.append(deleted_playlist)
+            
+        track_to_delete["original_playlist_id"] = job_id
+        deleted_playlist["items"].append(track_to_delete)
+        deleted_playlist["total_tracks"] = len(deleted_playlist["items"])
+        
+        save_history(history)
+    return {"message": "Track soft-deleted and moved to trash"}
+
+@app.post("/api/history/deleted-tracks/{track_id}/restore")
+async def restore_track(track_id: str):
+    with history_lock:
+        history = load_history()
+        track_to_restore = None
+        deleted_playlist = None
+        
+        for job in history:
+            if job.get("id") == "deleted_tracks":
+                deleted_playlist = job
+                items = job.get("items", [])
+                for track in items:
+                    if track.get("id") == track_id:
+                        track_to_restore = dict(track)
+                        items.remove(track)
+                        break
+                job["total_tracks"] = len(items)
+                break
+                
+        if not track_to_restore:
+            raise HTTPException(status_code=404, detail="Deleted track not found")
+            
+        original_id = track_to_restore.get("original_playlist_id")
+        restored = False
+        if original_id:
+            for job in history:
+                if job.get("id") == original_id:
+                    track_to_restore.pop("original_playlist_id", None)
+                    job.setdefault("items", []).append(track_to_restore)
+                    job["total_tracks"] = len(job["items"])
+                    success = sum(1 for t in job["items"] if t.get("status") in ["completed", "skipped"])
+                    job["success_count"] = success
+                    job["completed_tracks"] = success
+                    restored = True
+                    break
+                    
+        if not restored:
+            raise HTTPException(status_code=400, detail="Original playlist does not exist anymore.")
+            
+        save_history(history)
+    return {"message": "Track restored successfully"}
+
+@app.delete("/api/history/deleted-tracks/{track_id}/permanent")
+async def delete_track_permanent(track_id: str):
+    with history_lock:
+        history = load_history()
+        found = False
+        for job in history:
+            if job.get("id") == "deleted_tracks":
+                items = job.get("items", [])
+                for track in items:
+                    if track.get("id") == track_id:
+                        items.remove(track)
+                        found = True
+                        break
+                job["total_tracks"] = len(items)
+                break
+        if not found:
+            raise HTTPException(status_code=404, detail="Track not found in trash")
+        save_history(history)
+    return {"message": "Track deleted permanently"}
+
+@app.post("/api/history/{job_id}/items")
+async def save_job_items(job_id: str, req: SaveItemsRequest):
+    with history_lock:
+        history = load_history()
+        found = False
+        for job in history:
+            if job.get("id") == job_id:
+                job["items"] = [
+                    {
+                        "id": item.id,
+                        "title": item.title,
+                        "uploader": item.uploader or "Unknown",
+                        "duration": item.duration or 0,
+                        "thumbnail": item.thumbnail,
+                        "url": item.url,
+                        "status": "queued",
+                        "percentage": 0.0,
+                        "speed": "--",
+                        "start_time": "--",
+                        "end_time": "--",
+                        "error_detail": ""
+                    }
+                    for item in req.items
+                ]
+                job["total_tracks"] = len(job["items"])
+                found = True
+                break
+        if not found:
+            raise HTTPException(status_code=404, detail="Job not found")
+        save_history(history)
+    return {"message": "Job items saved successfully"}
+
+@app.post("/api/history/{job_id}/last-played")
+async def save_last_played(job_id: str, req: LastPlayedRequest):
+    with history_lock:
+        history = load_history()
+        found = False
+        for job in history:
+            if job.get("id") == job_id:
+                job["last_played_track_id"] = req.track_id
+                job["last_played_shuffle"] = req.shuffle_mode
+                job["shuffle_order"] = req.shuffle_order
+                job["shuffle_index"] = req.shuffle_index
+                found = True
+                break
+        if not found:
+            raise HTTPException(status_code=404, detail="Job not found")
+        save_history(history)
+    return {"message": "Playback position saved successfully"}
+
+@app.get("/api/media/stream")
+async def stream_media(video_url: str, title: str, format: str, download_dir: Optional[str] = None):
+    target_dir = download_dir or DOWNLOAD_DIR
+    local_path = check_local_duplicate(title, format, target_dir)
+    if local_path and os.path.exists(local_path):
+        return FileResponse(local_path)
+        
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+    }
+    if format == "audio":
+        ydl_opts['format'] = 'bestaudio/best'
+    else:
+        ydl_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best/bestvideo+bestaudio'
+        
+    try:
+        loop = asyncio.get_event_loop()
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = await loop.run_in_executor(None, lambda: ydl.extract_info(video_url, download=False))
+            stream_url = info.get('url')
+            if stream_url:
+                return RedirectResponse(stream_url)
+    except Exception as e:
+        print(f"Streaming extraction failed: {e}")
+    raise HTTPException(status_code=404, detail="Media stream URL could not be resolved")
+
+@app.post("/api/history/{job_id}/refresh")
+async def refresh_job(job_id: str):
+    with history_lock:
+        history = load_history()
+        
+    job = None
+    for item in history:
+        if item.get("id") == job_id:
+            job = item
+            break
+            
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found in history")
+        
+    url = job.get("url")
+    if not url:
+        raise HTTPException(status_code=400, detail="Job does not have a URL associated")
+        
+    url = get_clean_playlist_url(url)
+    original_dir = job.get("download_dir", DOWNLOAD_DIR)
+    
+    ydl_opts = {
+        'extract_flat': True,
+        'skip_download': True,
+        'quiet': True,
+        'no_warnings': True,
+        'socket_timeout': 15,
+        'no_interactive': True,
+    }
+    
+    try:
+        loop = asyncio.get_event_loop()
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = await loop.run_in_executor(None, lambda: ydl.extract_info(url, download=False))
+            
+        if not info:
+            raise HTTPException(status_code=400, detail="Could not retrieve video information")
+            
+        is_playlist = info.get('_type') == 'playlist'
+        raw_items = info.get('entries', []) if is_playlist else [info]
+        
+        # Get current tracks in history
+        existing_ids = {track.get("id") for track in job.get("items", [])}
+        
+        new_tracks = []
+        new_entries_for_download = []
+        
+        for entry in raw_items:
+            if not entry:
+                continue
+            video_id = entry.get('id') or entry.get('url')
+            if not video_id:
+                continue
+                
+            entry_title = entry.get('title') or "Unknown Title"
+            entry_url = f"https://www.youtube.com/watch?v={video_id}" if is_playlist else url
+            entry_uploader = entry.get('uploader') or entry.get('channel') or "Unknown"
+            entry_duration = entry.get('duration') or 0
+            entry_thumb = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg" if is_playlist else entry.get('thumbnail')
+            
+            track_data = {
+                "id": video_id,
+                "title": entry_title,
+                "uploader": entry_uploader,
+                "duration": entry_duration,
+                "thumbnail": entry_thumb,
+                "url": entry_url,
+                "status": "queued",
+                "percentage": 0.0,
+                "speed": "--",
+                "start_time": "--",
+                "end_time": "--",
+                "error_detail": ""
+            }
+            
+            if video_id not in existing_ids:
+                new_tracks.append(track_data)
+                new_entries_for_download.append(DownloadItem(
+                    id=video_id,
+                    title=entry_title,
+                    url=entry_url,
+                    uploader=entry_uploader,
+                    duration=entry_duration,
+                    thumbnail=entry_thumb
+                ))
+                
+        if not new_tracks:
+            return {"message": "No new tracks found. Playlist is up to date.", "new_count": 0}
+            
+        # Update job in history
+        with history_lock:
+            history = load_history()
+            target_job = None
+            for item in history:
+                if item.get("id") == job_id:
+                    target_job = item
+                    if "items" not in item:
+                        item["items"] = []
+                    item["items"].extend(new_tracks)
+                    item["total_tracks"] = len(item["items"])
+                    break
+            save_history(history)
+            
+            if target_job:
+                existing_job_num = target_job["job_num"]
+                existing_title = target_job["title"]
+            else:
+                existing_job_num = job.get("job_num", 1)
+                existing_title = job.get("title", "YouTube Playlist")
+            
+        # Sort items so that shorter tracks are downloaded first, and larger/longer tracks are downloaded last!
+        if new_entries_for_download:
+            new_entries_for_download.sort(key=lambda x: x.duration or 0)
+
+        # Queue the download for ONLY the new tracks
+        dl_req = DownloadRequest(
+            items=new_entries_for_download,
+            format=job.get("format", "audio"),
+            quality=job.get("quality", "highest"),
+            playlist_title=existing_title,
+            playlist_url=url,
+            skip_duplicates=True,
+            download_dir=original_dir
+        )
+        
+        job_data = {
+            "job_id": job_id,
+            "job_num": existing_job_num,
+            "title": existing_title,
+            "request": dl_req
+        }
+        
+        with queue_lock:
+            queue_state["pending_jobs"].append(job_data)
+            
+        download_queue.put(job_data)
+        return {"message": f"Queued {len(new_tracks)} new tracks", "new_count": len(new_tracks), "job_id": job_id, "job_num": existing_job_num}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
