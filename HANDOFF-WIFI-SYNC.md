@@ -54,7 +54,8 @@ adds an **opt-in** Wi-Fi Sync mode.
   "playlists": [{
     "id": "job_1783080277", "title": "All Songs", "pinned": true,
     "track_count": 833, "available_count": 531,
-    "tracks": [{ "file": "Manasa Palakave.mp3", "title": "Manasa Palakave",
+    "tracks": [{ "file": "Manasa Palakave.mp3", "size": 13251658,
+                 "title": "Manasa Palakave",
                  "artist": "S.P.Balasubramanyam - Topic", "duration": 311,
                  "youtube_id": "efv3iHUarxY" }]
   }]

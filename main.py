@@ -102,6 +102,28 @@ def clean_ansi(text: str) -> str:
     ansi_escape = re.compile(r'(?:\x1B[@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]')
     return ansi_escape.sub('', text)
 
+def apply_bypass_ydl_opts(ydl_opts: dict) -> dict:
+    """Applies common bypass options like SSL verification skip, player clients, user agents, and browser cookies."""
+    ydl_opts['nocheckcertificate'] = True
+    ydl_opts['extractor_args'] = {
+        'youtube': {
+            'player_client': ['web', 'ios', 'android']
+        }
+    }
+    ydl_opts['http_headers'] = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-us,en;q=0.5',
+    }
+    
+    # Load settings to check browser cookies
+    cfg = load_sync_config()
+    cookies_browser = cfg.get("cookies_from_browser", "none")
+    if cookies_browser and cookies_browser != "none":
+        ydl_opts['cookiesfrombrowser'] = (cookies_browser,)
+        
+    return ydl_opts
+
 # Helper: Sanitize windows filenames
 def sanitize_filename(filename: str) -> str:
     for char in ['\\', '/', ':', '*', '?', '"', '<', '>', '|']:
@@ -273,14 +295,14 @@ async def fetch_info(req: FetchRequest):
     
     url = get_clean_playlist_url(url)
 
-    ydl_opts = {
+    ydl_opts = apply_bypass_ydl_opts({
         'extract_flat': True,
         'skip_download': True,
         'quiet': True,
         'no_warnings': True,
         'socket_timeout': 15,
         'no_interactive': True,
-    }
+    })
 
     try:
         # Run in executor to prevent blocking
@@ -508,7 +530,7 @@ def run_download_job(job_data: dict):
             continue
 
         # Quality and format resolution
-        ydl_opts = {
+        ydl_opts = apply_bypass_ydl_opts({
             'quiet': True,
             'no_warnings': True,
             'progress_hooks': [progress_hook],
@@ -525,7 +547,7 @@ def run_download_job(job_data: dict):
             'postprocessor_args': {
                 'ffmpeg': ['-y'],
             },
-        }
+        })
 
         if request.format == "audio":
             ydl_opts['format'] = 'bestaudio/best'
@@ -884,6 +906,32 @@ async def get_history():
             "deleted": False,
             "is_virtual": True
         }
+
+        # 1.5. Compute union of all tracks for "Individual Downloads" (is_playlist = False)
+        individual_tracks = []
+        for job in history:
+            if job.get("deleted") or job.get("id") == "deleted_tracks":
+                continue
+            if job.get("is_playlist") is False:
+                for item in job.get("items", []):
+                    individual_tracks.append(item)
+                    
+        individual_downloads_job = {
+            "id": "individual_downloads",
+            "job_num": 0,
+            "title": "Individual Downloads",
+            "url": "",
+            "format": "audio",
+            "quality": "highest",
+            "items": individual_tracks,
+            "total_tracks": len(individual_tracks),
+            "success_count": sum(1 for t in individual_tracks if t.get("status") in ["completed", "skipped"]),
+            "failure_count": sum(1 for t in individual_tracks if t.get("status") == "error"),
+            "completed_tracks": len(individual_tracks),
+            "pinned": False,
+            "deleted": False,
+            "is_virtual": True
+        }
         
         # 2. Find or synthesize "Deleted Tracks"
         deleted_tracks_job = None
@@ -912,7 +960,7 @@ async def get_history():
             history.append(deleted_tracks_job)
             save_history(history)
             
-        return [all_downloads_job] + history
+        return [all_downloads_job, individual_downloads_job] + history
 
 @app.post("/api/history/clear")
 async def clear_history():
@@ -946,14 +994,14 @@ async def resume_job(req: ResumeRequest):
     original_dir = job.get("download_dir", DOWNLOAD_DIR)
 
     # 2. Extract playlist entries from YouTube
-    ydl_opts = {
+    ydl_opts = apply_bypass_ydl_opts({
         'extract_flat': True,
         'skip_download': True,
         'quiet': True,
         'no_warnings': True,
         'socket_timeout': 15,
         'no_interactive': True,
-    }
+    })
     
     try:
         loop = asyncio.get_event_loop()
@@ -1237,7 +1285,8 @@ async def create_playlist(req: CreatePlaylistRequest):
             "failure_count": 0,
             "completed_tracks": 0,
             "pinned": False,
-            "deleted": False
+            "deleted": False,
+            "is_playlist": True
         }
         history.insert(0, new_job)
         save_history(history)
@@ -1298,7 +1347,8 @@ async def import_playlist(req: ImportFolderRequest):
             "failure_count": 0,
             "completed_tracks": len(items),
             "pinned": False,
-            "deleted": False
+            "deleted": False,
+            "is_playlist": True
         }
         history.insert(0, new_job)
         save_history(history)
@@ -1537,10 +1587,10 @@ async def stream_media(video_url: str, title: str, format: str, download_dir: Op
     if local_path and os.path.exists(local_path):
         return FileResponse(local_path)
         
-    ydl_opts = {
+    ydl_opts = apply_bypass_ydl_opts({
         'quiet': True,
         'no_warnings': True,
-    }
+    })
     if format == "audio":
         ydl_opts['format'] = 'bestaudio/best'
     else:
@@ -1578,14 +1628,14 @@ async def refresh_job(job_id: str):
     url = get_clean_playlist_url(url)
     original_dir = job.get("download_dir", DOWNLOAD_DIR)
     
-    ydl_opts = {
+    ydl_opts = apply_bypass_ydl_opts({
         'extract_flat': True,
         'skip_download': True,
         'quiet': True,
         'no_warnings': True,
         'socket_timeout': 15,
         'no_interactive': True,
-    }
+    })
     
     try:
         loop = asyncio.get_event_loop()
@@ -1598,74 +1648,90 @@ async def refresh_job(job_id: str):
         is_playlist = info.get('_type') == 'playlist'
         raw_items = info.get('entries', []) if is_playlist else [info]
         
-        # Get current tracks in history
-        existing_ids = {track.get("id") for track in job.get("items", [])}
-        
-        new_tracks = []
         new_entries_for_download = []
         
-        for entry in raw_items:
-            if not entry:
-                continue
-            video_id = entry.get('id') or entry.get('url')
-            if not video_id:
-                continue
-                
-            entry_title = entry.get('title') or "Unknown Title"
-            entry_url = f"https://www.youtube.com/watch?v={video_id}" if is_playlist else url
-            entry_uploader = entry.get('uploader') or entry.get('channel') or "Unknown"
-            entry_duration = entry.get('duration') or 0
-            entry_thumb = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg" if is_playlist else entry.get('thumbnail')
-            
-            track_data = {
-                "id": video_id,
-                "title": entry_title,
-                "uploader": entry_uploader,
-                "duration": entry_duration,
-                "thumbnail": entry_thumb,
-                "url": entry_url,
-                "status": "queued",
-                "percentage": 0.0,
-                "speed": "--",
-                "start_time": "--",
-                "end_time": "--",
-                "error_detail": ""
-            }
-            
-            if video_id not in existing_ids:
-                new_tracks.append(track_data)
-                new_entries_for_download.append(DownloadItem(
-                    id=video_id,
-                    title=entry_title,
-                    url=entry_url,
-                    uploader=entry_uploader,
-                    duration=entry_duration,
-                    thumbnail=entry_thumb
-                ))
-                
-        if not new_tracks:
-            return {"message": "No new tracks found. Playlist is up to date.", "new_count": 0}
-            
-        # Update job in history
         with history_lock:
             history = load_history()
             target_job = None
             for item in history:
                 if item.get("id") == job_id:
                     target_job = item
-                    if "items" not in item:
-                        item["items"] = []
-                    item["items"].extend(new_tracks)
-                    item["total_tracks"] = len(item["items"])
                     break
+                    
+            if not target_job:
+                raise HTTPException(status_code=404, detail="Job not found in history")
+                
+            existing_ids = set()
+            for track in target_job.get("items", []):
+                existing_ids.add(track.get("id"))
+                if track.get("status") in ["error", "failed"]:
+                    track["status"] = "queued"
+                    track["percentage"] = 0.0
+                    track["speed"] = "--"
+                    track["start_time"] = "--"
+                    track["end_time"] = "--"
+                    track["error_detail"] = ""
+                    new_entries_for_download.append(DownloadItem(
+                        id=track["id"],
+                        title=track["title"],
+                        url=track.get("url") or f"https://www.youtube.com/watch?v={track['id']}",
+                        uploader=track.get("uploader") or "Unknown",
+                        duration=track.get("duration") or 0,
+                        thumbnail=track.get("thumbnail")
+                    ))
+            
+            new_tracks = []
+            for entry in raw_items:
+                if not entry:
+                    continue
+                video_id = entry.get('id') or entry.get('url')
+                if not video_id:
+                    continue
+                    
+                if video_id not in existing_ids:
+                    entry_title = entry.get('title') or "Unknown Title"
+                    entry_url = f"https://www.youtube.com/watch?v={video_id}" if is_playlist else url
+                    entry_uploader = entry.get('uploader') or entry.get('channel') or "Unknown"
+                    entry_duration = entry.get('duration') or 0
+                    entry_thumb = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg" if is_playlist else entry.get('thumbnail')
+                    
+                    track_data = {
+                        "id": video_id,
+                        "title": entry_title,
+                        "uploader": entry_uploader,
+                        "duration": entry_duration,
+                        "thumbnail": entry_thumb,
+                        "url": entry_url,
+                        "status": "queued",
+                        "percentage": 0.0,
+                        "speed": "--",
+                        "start_time": "--",
+                        "end_time": "--",
+                        "error_detail": ""
+                    }
+                    new_tracks.append(track_data)
+                    new_entries_for_download.append(DownloadItem(
+                        id=video_id,
+                        title=entry_title,
+                        url=entry_url,
+                        uploader=entry_uploader,
+                        duration=entry_duration,
+                        thumbnail=entry_thumb
+                    ))
+            
+            if not new_tracks and not new_entries_for_download:
+                return {"message": "No new or failed tracks to download.", "new_count": 0}
+                
+            if new_tracks:
+                if "items" not in target_job:
+                    target_job["items"] = []
+                target_job["items"].extend(new_tracks)
+                target_job["total_tracks"] = len(target_job["items"])
+                
             save_history(history)
             
-            if target_job:
-                existing_job_num = target_job["job_num"]
-                existing_title = target_job["title"]
-            else:
-                existing_job_num = job.get("job_num", 1)
-                existing_title = job.get("title", "YouTube Playlist")
+            existing_job_num = target_job["job_num"]
+            existing_title = target_job["title"]
             
         # Sort items so that shorter tracks are downloaded first, and larger/longer tracks are downloaded last!
         if new_entries_for_download:
@@ -1721,7 +1787,7 @@ sync_config_lock = threading.Lock()
 def load_sync_config() -> dict:
     """Reads sync_config.json, creating it (disabled, fresh pairing token) on first use."""
     with sync_config_lock:
-        cfg = {"enabled": False, "port": 8765}
+        cfg = {"enabled": False, "port": 8765, "cookies_from_browser": "none"}
         if os.path.exists(SYNC_CONFIG_FILE):
             try:
                 with open(SYNC_CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -1756,14 +1822,18 @@ def _clean_fuzzy_sync(s: str) -> str:
     return "".join(c.lower() for c in s if c.isalnum())
 
 def _build_file_index(download_dir: str) -> dict:
-    """fuzzy-title -> filename for every .mp3 in a folder (one listdir per folder)."""
+    """fuzzy-title -> {file, size} for every .mp3 in a folder (one listdir per folder)."""
     index = {}
     try:
         if os.path.exists(download_dir):
             for f in os.listdir(download_dir):
                 name, ext = os.path.splitext(f)
                 if ext.lower() == ".mp3":
-                    index[_clean_fuzzy_sync(name)] = f
+                    try:
+                        size = os.path.getsize(os.path.join(download_dir, f))
+                    except OSError:
+                        size = None
+                    index[_clean_fuzzy_sync(name)] = {"file": f, "size": size}
     except Exception:
         pass
     return index
@@ -1788,9 +1858,10 @@ def build_sync_manifest() -> dict:
         tracks = []
         for item in job.get("items", []):
             title = item.get("title", "")
-            filename = index.get(_clean_fuzzy_sync(title)) if title else None
+            entry = index.get(_clean_fuzzy_sync(title)) if title else None
             tracks.append({
-                "file": filename,
+                "file": entry["file"] if entry else None,
+                "size": entry.get("size") if entry else None,
                 "title": title,
                 "artist": item.get("uploader") or "Unknown Artist",
                 "duration": item.get("duration") or 0,
@@ -1880,6 +1951,7 @@ def _lan_ips() -> list:
 class SyncConfigRequest(BaseModel):
     enabled: bool
     port: int = 8765
+    cookies_from_browser: Optional[str] = "none"
 
 def _sync_config_response(cfg: dict) -> dict:
     restart_required = (
@@ -1890,6 +1962,7 @@ def _sync_config_response(cfg: dict) -> dict:
         "enabled": bool(cfg.get("enabled")),
         "port": int(cfg.get("port", 8765)),
         "token": cfg.get("token", ""),
+        "cookies_from_browser": cfg.get("cookies_from_browser", "none"),
         "lan_ips": _lan_ips(),
         "restart_required": restart_required,
     }
@@ -1905,7 +1978,7 @@ async def set_sync_config(req: SyncConfigRequest, request: Request):
     if not (1024 <= req.port <= 65535):
         raise HTTPException(status_code=400, detail="Port must be between 1024 and 65535")
     with sync_config_lock:
-        cfg = {"enabled": False, "port": 8765}
+        cfg = {"enabled": False, "port": 8765, "cookies_from_browser": "none"}
         if os.path.exists(SYNC_CONFIG_FILE):
             try:
                 with open(SYNC_CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -1914,6 +1987,7 @@ async def set_sync_config(req: SyncConfigRequest, request: Request):
                 pass
         cfg["enabled"] = req.enabled
         cfg["port"] = req.port
+        cfg["cookies_from_browser"] = req.cookies_from_browser or "none"
         if not cfg.get("token"):
             cfg["token"] = secrets.token_hex(16)
         with open(SYNC_CONFIG_FILE, "w", encoding="utf-8") as f:
