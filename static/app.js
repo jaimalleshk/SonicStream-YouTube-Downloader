@@ -36,6 +36,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const closeHistoryModalBtn = document.getElementById("closeHistoryModalBtn");
     const clearHistoryBtn = document.getElementById("clearHistoryBtn");
     const historyTableBody = document.getElementById("historyTableBody");
+    const historySearch = document.getElementById("historySearch");
+    const historyTypeFilter = document.getElementById("historyTypeFilter");
 
     // Pagination elements
     const btnFirstPage = document.getElementById("btnFirstPage");
@@ -52,6 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentEventSource = null;
     let currentSortCol = null;
     let sortAsc = true;
+    let historyItemsCache = []; // Global history log cache for search filtering
 
     // Pagination State
     let currentPage = 1;
@@ -144,6 +147,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const qualityTextEl = document.getElementById("activeQualityText");
         if (formatTextEl) formatTextEl.textContent = formatText;
         if (qualityTextEl) qualityTextEl.textContent = qualityText;
+
+        // Dynamic size calculations based on selection formatting
+        updateSelectionMeta();
     }
 
     // Analyze link
@@ -365,6 +371,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const jobDisplay = state.job_num !== "--" ? `#${state.job_num}` : "--";
             const speedDisplay = state.speed !== "0 KB/s" ? state.speed : "--";
             
+            const isPlayable = (state.status === "completed" || state.status === "skipped");
+            if (isPlayable) {
+                row.classList.add("playable");
+            }
+            const playIcon = isPlayable ? " ▶" : "";
+            
             row.innerHTML = `
                 <td><input type="checkbox" class="video-checkbox" checked data-id="${item.id}"></td>
                 <td class="thumb-cell"><img src="${item.thumbnail || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=120'}" alt="Thumb"></td>
@@ -383,7 +395,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <td class="speed-cell" id="speed-${item.id}">${speedDisplay}</td>
                 <td class="time-cell" id="start-${item.id}">${state.start_time}</td>
                 <td class="time-cell" id="end-${item.id}">${state.end_time}</td>
-                <td><span class="status-detail-cell ${state.status}" id="status-detail-${item.id}">${state.status}</span></td>
+                <td><span class="status-detail-cell ${state.status}" id="status-detail-${item.id}" style="${isPlayable ? 'cursor: pointer;' : ''}" title="${isPlayable ? 'Click to Play' : ''}">${state.status}${playIcon}</span></td>
                 <td class="error-detail-cell" id="error-${item.id}" title="${state.error_detail}">${state.error_detail || "--"}</td>
             `;
             
@@ -392,9 +404,40 @@ document.addEventListener("DOMContentLoaded", () => {
                 const allChecked = Array.from(document.querySelectorAll(".video-checkbox")).every(c => c.checked);
                 headerCheckbox.checked = allChecked;
             });
+
+            // Bind Direct Playback shortcuts on completed tracks
+            if (isPlayable) {
+                row.addEventListener("dblclick", () => {
+                    playLocalFile(item.title);
+                });
+                const badge = row.querySelector(".status-detail-cell");
+                if (badge) {
+                    badge.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        playLocalFile(item.title);
+                    });
+                }
+            }
             
             playlistTableBody.appendChild(row);
         });
+    }
+
+    async function playLocalFile(title) {
+        const format = document.querySelector('input[name="format"]:checked')?.value || "audio";
+        try {
+            const res = await fetch("/api/play-file", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ title, format })
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                alert(`Playback failed: ${data.detail}`);
+            }
+        } catch (e) {
+            alert(`Playback failed: ${e.message}`);
+        }
     }
 
     // Toggle all checkboxes
@@ -426,9 +469,49 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     function updateSelectionMeta() {
-        const checkedCount = getSelectedItems().length;
-        playlistMeta.textContent = `${checkedCount} of ${playlistItems.length} items selected`;
-        downloadBtn.disabled = checkedCount === 0;
+        const selected = getSelectedItems();
+        const checkedCount = selected.length;
+        
+        if (checkedCount === 0) {
+            playlistMeta.textContent = `0 of ${playlistItems.length} items selected`;
+            downloadBtn.disabled = true;
+            return;
+        }
+
+        // Sum durations
+        const totalSeconds = selected.reduce((sum, item) => sum + (item.duration || 0), 0);
+        
+        // Sum file size estimations
+        const format = document.querySelector('input[name="format"]:checked')?.value || "audio";
+        const quality = document.querySelector('input[name="quality"]:checked')?.value || "high";
+        
+        let bytesPerSec = 0.024 * 1024 * 1024;
+        if (format === "audio") {
+            const rates = { low: 0.008, medium: 0.016, high: 0.024, highest: 0.04 };
+            bytesPerSec = (rates[quality] || 0.024) * 1024 * 1024;
+        } else {
+            const rates = { low: 0.05, medium: 0.1, high: 0.2, highest: 0.4 };
+            bytesPerSec = (rates[quality] || 0.2) * 1024 * 1024;
+        }
+        
+        const estSizeBytes = totalSeconds * bytesPerSec;
+        const estSizeMB = (estSizeBytes / (1024 * 1024)).toFixed(0);
+        
+        // Format duration
+        let durationStr = "";
+        const hrs = Math.floor(totalSeconds / 3600);
+        const mins = Math.floor((totalSeconds % 3600) / 60);
+        const secs = Math.floor(totalSeconds % 60);
+        if (hrs > 0) {
+            durationStr = `${hrs}h ${mins}m`;
+        } else if (mins > 0) {
+            durationStr = `${mins}m ${secs}s`;
+        } else {
+            durationStr = `${secs}s`;
+        }
+
+        playlistMeta.textContent = `${checkedCount} of ${playlistItems.length} items selected (${durationStr} | ~${estSizeMB} MB)`;
+        downloadBtn.disabled = false;
     }
 
     function getSelectedItems() {
@@ -665,8 +748,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (startCell) startCell.textContent = itemState.start_time;
                     if (endCell) endCell.textContent = itemState.end_time;
                     if (detailCell) {
-                        detailCell.textContent = itemState.status;
+                        const isPlayable = (itemState.status === "completed" || itemState.status === "skipped");
+                        const playIcon = isPlayable ? " ▶" : "";
+                        detailCell.textContent = `${itemState.status}${playIcon}`;
                         detailCell.className = `status-detail-cell ${itemState.status}`;
+                        detailCell.style.cursor = isPlayable ? 'pointer' : '';
+                        detailCell.title = isPlayable ? 'Click to Play' : '';
                     }
                     if (errorCell) {
                         errorCell.textContent = itemState.error_detail || "--";
@@ -758,27 +845,69 @@ document.addEventListener("DOMContentLoaded", () => {
         loadHistoryItems();
     }
 
+    // Bind event listeners to Jobs search filters
+    historySearch.addEventListener("input", filterAndRenderHistory);
+    historyTypeFilter.addEventListener("change", filterAndRenderHistory);
+
     async function loadHistoryItems() {
-        historyTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Loading logs...</td></tr>`;
+        historyTableBody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Loading logs...</td></tr>`;
         try {
             const res = await fetch("/api/history");
-            const data = await res.json();
-            renderHistory(data);
+            historyItemsCache = await res.json();
+            filterAndRenderHistory();
         } catch (e) {
-            historyTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--error); padding: 1.5rem;">Failed to load history: ${e.message}</td></tr>`;
+            historyTableBody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--error); padding: 1.5rem;">Failed to load history: ${e.message}</td></tr>`;
         }
+    }
+
+    function filterAndRenderHistory() {
+        const query = historySearch.value.toLowerCase().trim();
+        const typeFilter = historyTypeFilter.value;
+        
+        const filtered = historyItemsCache.filter(item => {
+            const title = item.title.toLowerCase();
+            const matchesText = title.includes(query);
+            
+            const isPlaylist = item.is_playlist || item.total_tracks > 1;
+            let matchesType = false;
+            if (typeFilter === "all") {
+                matchesType = true;
+            } else if (typeFilter === "playlist" && isPlaylist) {
+                matchesType = true;
+            } else if (typeFilter === "single" && !isPlaylist) {
+                matchesType = true;
+            }
+            
+            return matchesText && matchesType;
+        });
+        
+        renderHistory(filtered);
     }
 
     function renderHistory(items) {
         historyTableBody.innerHTML = "";
         if (!items || items.length === 0) {
-            historyTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem 0;">No download logs found.</td></tr>`;
+            historyTableBody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 2rem 0;">No download logs found.</td></tr>`;
             return;
         }
 
         items.forEach(item => {
             const row = document.createElement("tr");
-            const dateStr = new Date(item.timestamp).toLocaleString();
+            
+            // Find all history entries with the exact same URL to compute URL-specific stats
+            const relatedEntries = historyItemsCache.filter(h => h.url && h.url === item.url);
+            const timesDownloaded = relatedEntries.length;
+            
+            // Sort related entries by timestamp ascending to determine first and last run dates
+            const sortedRelated = [...relatedEntries].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            
+            const firstDateStr = sortedRelated.length > 0 
+                ? new Date(sortedRelated[0].timestamp).toLocaleString() 
+                : new Date(item.timestamp).toLocaleString();
+                
+            const lastDateStr = sortedRelated.length > 0 
+                ? new Date(sortedRelated[sortedRelated.length - 1].timestamp).toLocaleString() 
+                : new Date(item.timestamp).toLocaleString();
             
             const isPlaylist = item.is_playlist || item.total_tracks > 1;
             const typeLabel = isPlaylist ? "Playlist" : "Single File";
@@ -794,7 +923,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 <td><span class="history-badge ${typeClass}">${typeLabel}</span></td>
                 <td style="font-weight: 600; color: var(--text-primary);" title="${item.title}">${item.title}</td>
                 <td class="duration-cell" style="text-align: center;">${item.total_tracks}</td>
-                <td class="time-cell">${dateStr}</td>
+                <td class="duration-cell" style="text-align: center; font-family: var(--font-mono); font-weight: 700; color: var(--neon-blue);">${timesDownloaded}</td>
+                <td class="time-cell">${firstDateStr}</td>
+                <td class="time-cell">${lastDateStr}</td>
                 <td style="color: #27c93f; font-weight: 700; font-family: var(--font-mono); text-align: center;">${successCount}</td>
                 <td style="color: var(--error); font-weight: 700; font-family: var(--font-mono); text-align: center;">${failureCount}</td>
                 <td>

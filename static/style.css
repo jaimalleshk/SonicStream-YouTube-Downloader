@@ -1003,5 +1003,32 @@ input[type="checkbox"]:checked::before {
     cursor: help;
 }
 
+/* Clickable playback cells */
+.status-detail-cell.completed,
+.status-detail-cell.skipped {
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.status-detail-cell.completed:hover {
+    background: rgba(39, 201, 63, 0.35) !important;
+    border-color: #27c93f;
+    box-shadow: 0 0 8px rgba(39, 201, 63, 0.4);
+}
+
+.status-detail-cell.skipped:hover {
+    background: rgba(251, 191, 36, 0.35) !important;
+    border-color: #fbbf24;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+}
+
+.playlist-row.playable td {
+    border-bottom-color: rgba(39, 201, 63, 0.15);
+}
+
+.playlist-row.playable:hover td {
+    background: rgba(39, 201, 63, 0.03) !important;
+}
+
 
 

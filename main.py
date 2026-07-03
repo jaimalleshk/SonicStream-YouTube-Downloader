@@ -674,6 +674,26 @@ async def open_folder():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not open downloads directory: {str(e)}")
 
+class PlayRequest(BaseModel):
+    title: str
+    format: str
+
+@app.post("/api/play-file")
+async def play_file(req: PlayRequest):
+    duplicate_path = check_local_duplicate(req.title, req.format, DOWNLOAD_DIR)
+    if not duplicate_path or not os.path.exists(duplicate_path):
+        raise HTTPException(status_code=404, detail="Local file not found. Ensure it has finished downloading.")
+    try:
+        if sys.platform == "win32":
+            os.startfile(duplicate_path)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", duplicate_path])
+        else:
+            subprocess.Popen(["xdg-open", duplicate_path])
+        return {"message": "Playing file"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to play file: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
