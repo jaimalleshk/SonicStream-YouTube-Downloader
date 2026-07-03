@@ -1,0 +1,85 @@
+# Handoff: Wi-Fi Sync feature (`feature/wifi-sync` branch)
+
+**Author:** Claude (working on the companion iPhone app, MusicApp)
+**Date:** 2026-07-03
+**For:** Antigravity — review and merge when you're back in quota.
+
+## Why
+
+The iPhone companion app (MusicApp, github.com/jaimalleshk/MusicApp) mirrors
+SonicStream's playlists and plays the downloaded MP3s. To get playlists + files
+onto the phone without a USB cable, the phone pulls them from SonicStream's
+FastAPI server over the local Wi-Fi network. SonicStream previously bound to
+`127.0.0.1:<random>`, which is unreachable from other devices — this branch
+adds an **opt-in** Wi-Fi Sync mode.
+
+## Design constraints honored
+
+- **Nothing existing was modified.** `main.py` changes are a single appended
+  section (marked `Wi-Fi Sync module`) — `git diff master main.py` shows
+  additions only, before the `if __name__` block. No frontend files touched
+  (your uncommitted player/playlists work was snapshot-committed as-is on
+  `master` before branching — commit "Snapshot: current working state").
+- **Off by default.** Without `sync_config.json` saying `"enabled": true`,
+  `gui.py` behaves byte-for-byte like before: loopback host, random port.
+- **Token-protected.** All sync endpoints except `/api/sync/info` require a
+  pairing token (`X-Sync-Token` header or `?token=`). Tokenless requests are
+  only honored from 127.0.0.1 (the desktop UI itself). Token comparison uses
+  `secrets.compare_digest`. `sync_config.json` is gitignored (holds the secret).
+
+## What was added
+
+| File | Change |
+|---|---|
+| `main.py` | Appended Wi-Fi Sync module: config loader + 4 endpoints (below) |
+| `gui.py` | Reads sync config at launch; binds `0.0.0.0:<fixed port>` only when enabled and the port is free, else falls back to old behavior. WebView URL unchanged (`127.0.0.1`) |
+| `wifi_sync_setup.py` | New CLI helper: `on` / `off` / `new-token` / status+pairing info |
+| `.gitignore` | + `sync_config.json` |
+| `HANDOFF-WIFI-SYNC.md` | this file |
+
+### Endpoints
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `GET /api/sync/info` | none | Discovery ping: app name, sync version, enabled flag |
+| `GET /api/sync/manifest` | token | All non-deleted **audio** playlists (video jobs excluded), each track with `file` = exact local filename or `null` if not downloaded. Uses the same fuzzy title→filename rule as `check_local_duplicate` (one `listdir` per folder, indexed) |
+| `GET /api/sync/file/{playlist_id}/{filename}` | token | Serves one MP3 from that playlist's `download_dir`. Basename + `commonpath` containment checks against traversal |
+| `POST /api/sync/export-manifest` | token | Writes `playlists_manifest.json` into the downloads folder so playlist structure travels with the files on USB/OneDrive transfers too |
+
+### Manifest schema (v1) — the iPhone app is built against this
+
+```json
+{
+  "version": 1, "app": "SonicStream", "exported_at": "ISO-8601",
+  "playlists": [{
+    "id": "job_1783080277", "title": "All Songs", "pinned": true,
+    "track_count": 833, "available_count": 531,
+    "tracks": [{ "file": "Manasa Palakave.mp3", "title": "Manasa Palakave",
+                 "artist": "S.P.Balasubramanyam - Topic", "duration": 311,
+                 "youtube_id": "efv3iHUarxY" }]
+  }]
+}
+```
+
+Please treat this schema as a contract: add fields freely, but don't rename or
+remove existing ones without bumping `version`.
+
+## Verified (2026-07-03, real data: 833-track history, 407-file folder)
+
+- `import main` clean; all 4 routes registered; existing `/api/history` unaffected
+- Wrong token → 401; good token → manifest (All Songs: 531/833 files resolved)
+- File download: 200, 13.2 MB MP3 streamed; `..%5C` traversal → 400
+- Export writes `playlists_manifest.json` (3 playlists) into the downloads folder
+- Default launch path (sync disabled): unchanged behavior confirmed by code path
+
+## User-facing flow (current, no UI)
+
+1. `python wifi_sync_setup.py on` → prints server URL + token
+2. Restart SonicStream (allow the one-time Windows Firewall prompt)
+3. In the iPhone app: enter `http://<pc-ip>:8765` + token → pulls manifest, downloads tracks
+
+## Suggested follow-ups for you (not done, by design)
+
+- Settings UI section: Wi-Fi Sync toggle, show IP/port/token, QR code for pairing
+- Call `POST /api/sync/export-manifest` automatically after each completed download job
+- Optional: mDNS/Bonjour advertisement so the phone can discover the PC without typing an IP

@@ -1698,6 +1698,163 @@ async def refresh_job(job_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# =============================================================================
+# Wi-Fi Sync module (branch: feature/wifi-sync)
+#
+# Lets the companion iPhone app (MusicApp) pull playlists and audio files over
+# the local network. Fully additive — nothing above this line was modified.
+#
+# - Disabled by default. Enable via wifi_sync_setup.py (writes sync_config.json
+#   next to history.json; gui.py binds the server to the LAN only when enabled).
+# - Every endpoint except /api/sync/info requires the pairing token from
+#   sync_config.json (header `X-Sync-Token` or `?token=`). Requests from
+#   127.0.0.1 that carry no token are allowed, so the desktop UI could call
+#   these endpoints too.
+# - Audio only by design: video jobs are excluded from the manifest.
+# =============================================================================
+import secrets
+from fastapi import Request
+
+SYNC_CONFIG_FILE = os.path.join(BASE_DIR, "sync_config.json")
+sync_config_lock = threading.Lock()
+
+def load_sync_config() -> dict:
+    """Reads sync_config.json, creating it (disabled, fresh pairing token) on first use."""
+    with sync_config_lock:
+        cfg = {"enabled": False, "port": 8765}
+        if os.path.exists(SYNC_CONFIG_FILE):
+            try:
+                with open(SYNC_CONFIG_FILE, "r", encoding="utf-8") as f:
+                    cfg.update(json.load(f))
+            except Exception:
+                pass
+        if not cfg.get("token"):
+            cfg["token"] = secrets.token_hex(16)
+            try:
+                with open(SYNC_CONFIG_FILE, "w", encoding="utf-8") as f:
+                    json.dump(cfg, f, indent=2)
+            except Exception:
+                pass
+        return cfg
+
+def _sync_auth(request: Request):
+    """Token check: a supplied token must match; no token is OK only from localhost."""
+    cfg = load_sync_config()
+    supplied = request.headers.get("x-sync-token") or request.query_params.get("token")
+    if supplied:
+        if secrets.compare_digest(supplied, str(cfg.get("token", ""))):
+            return
+        raise HTTPException(status_code=401, detail="Invalid sync token")
+    client_host = request.client.host if request.client else ""
+    if client_host in ("127.0.0.1", "::1"):
+        return
+    raise HTTPException(status_code=401, detail="Sync token required")
+
+def _clean_fuzzy_sync(s: str) -> str:
+    # Same normalization rule as check_local_duplicate() so title->file matching
+    # behaves identically to the in-app player.
+    return "".join(c.lower() for c in s if c.isalnum())
+
+def _build_file_index(download_dir: str) -> dict:
+    """fuzzy-title -> filename for every .mp3 in a folder (one listdir per folder)."""
+    index = {}
+    try:
+        if os.path.exists(download_dir):
+            for f in os.listdir(download_dir):
+                name, ext = os.path.splitext(f)
+                if ext.lower() == ".mp3":
+                    index[_clean_fuzzy_sync(name)] = f
+    except Exception:
+        pass
+    return index
+
+def build_sync_manifest() -> dict:
+    """All non-deleted audio playlists with exact local filenames per track."""
+    with history_lock:
+        history = load_history()
+
+    dir_indexes: dict = {}
+    playlists = []
+    for job in history:
+        if job.get("deleted") or job.get("id") in ("all_downloads", "deleted_tracks"):
+            continue
+        if job.get("format", "audio") != "audio":
+            continue
+        target_dir = job.get("download_dir", DOWNLOAD_DIR)
+        if target_dir not in dir_indexes:
+            dir_indexes[target_dir] = _build_file_index(target_dir)
+        index = dir_indexes[target_dir]
+
+        tracks = []
+        for item in job.get("items", []):
+            title = item.get("title", "")
+            filename = index.get(_clean_fuzzy_sync(title)) if title else None
+            tracks.append({
+                "file": filename,
+                "title": title,
+                "artist": item.get("uploader") or "Unknown Artist",
+                "duration": item.get("duration") or 0,
+                "youtube_id": item.get("id", ""),
+            })
+
+        playlists.append({
+            "id": job.get("id", ""),
+            "title": job.get("title", "Untitled"),
+            "pinned": bool(job.get("pinned")),
+            "track_count": len(tracks),
+            "available_count": sum(1 for t in tracks if t["file"]),
+            "tracks": tracks,
+        })
+
+    return {
+        "version": 1,
+        "app": "SonicStream",
+        "exported_at": datetime.now().isoformat(),
+        "playlists": playlists,
+    }
+
+@app.get("/api/sync/info")
+async def sync_info():
+    """Tokenless discovery ping so the phone can identify the server."""
+    cfg = load_sync_config()
+    return {"app": "SonicStream", "sync_version": 1, "wifi_sync_enabled": bool(cfg.get("enabled"))}
+
+@app.get("/api/sync/manifest")
+async def sync_manifest(request: Request):
+    _sync_auth(request)
+    return build_sync_manifest()
+
+@app.get("/api/sync/file/{playlist_id}/{filename}")
+async def sync_file(playlist_id: str, filename: str, request: Request):
+    _sync_auth(request)
+    if filename != os.path.basename(filename) or filename in ("", ".", ".."):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    with history_lock:
+        history = load_history()
+    job = next((j for j in history if j.get("id") == playlist_id), None)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+
+    target_dir = os.path.abspath(job.get("download_dir", DOWNLOAD_DIR))
+    file_path = os.path.abspath(os.path.join(target_dir, filename))
+    if os.path.commonpath([file_path, target_dir]) != target_dir:
+        raise HTTPException(status_code=400, detail="Invalid path")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(file_path, media_type="audio/mpeg", filename=filename)
+
+@app.post("/api/sync/export-manifest")
+async def sync_export_manifest(request: Request):
+    """Writes playlists_manifest.json into the downloads folder, so the playlist
+    structure travels with the files on any transfer path (USB copy, OneDrive)."""
+    _sync_auth(request)
+    manifest = build_sync_manifest()
+    out_path = os.path.join(DOWNLOAD_DIR, "playlists_manifest.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+    return {"message": "Manifest exported", "path": out_path, "playlists": len(manifest["playlists"])}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
