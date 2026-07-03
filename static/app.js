@@ -52,6 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Global Caches for Interactive Grid Sorting & Live Sync
     let playlistItems = [];
     let localItemStates = {}; // Map of item.id -> { job_num, status, percentage, speed, start_time, end_time, error_detail }
+    let selectedItemIds = new Set(); // Global selection state model across pagination pages!
     let currentEventSource = null;
     let currentSortCol = null;
     let sortAsc = true;
@@ -205,6 +206,7 @@ document.addEventListener("DOMContentLoaded", () => {
         playlistSection.classList.add("hidden");
         playlistItems = [];
         localItemStates = {};
+        selectedItemIds.clear();
         currentPage = 1;
 
         try {
@@ -222,7 +224,7 @@ document.addEventListener("DOMContentLoaded", () => {
             playlistItems = data.entries;
             playlistTitle.textContent = data.title;
             
-            // Initialize local states cache
+            // Initialize local states cache and select all by default
             playlistItems.forEach(item => {
                 localItemStates[item.id] = {
                     job_num: "--",
@@ -233,13 +235,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     end_time: "--",
                     error_detail: ""
                 };
+                selectedItemIds.add(item.id);
             });
 
             renderPlaylistTable(playlistItems);
             
-            // Auto check all items by default
             headerCheckbox.checked = true;
-            toggleAllCheckboxes(true);
             updateSelectionMeta();
             
             playlistSection.classList.remove("hidden");
@@ -383,6 +384,14 @@ document.addEventListener("DOMContentLoaded", () => {
         btnNextPage.disabled = currentPage === totalPages;
         btnLastPage.disabled = currentPage === totalPages;
 
+        // Sync header checkbox based on current page states
+        let allPageChecked = true;
+        if (pageItems.length === 0) allPageChecked = false;
+        pageItems.forEach(item => {
+            if (!selectedItemIds.has(item.id)) allPageChecked = false;
+        });
+        headerCheckbox.checked = allPageChecked;
+
         // Render pageItems rows
         pageItems.forEach(item => {
             const state = localItemStates[item.id] || {
@@ -409,8 +418,10 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             const playIcon = isPlayable ? " ▶" : "";
             
+            const isChecked = selectedItemIds.has(item.id);
+            
             row.innerHTML = `
-                <td><input type="checkbox" class="video-checkbox" checked data-id="${item.id}"></td>
+                <td><input type="checkbox" class="video-checkbox" ${isChecked ? 'checked' : ''} data-id="${item.id}"></td>
                 <td class="thumb-cell"><img src="${item.thumbnail || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=120'}" alt="Thumb"></td>
                 <td class="title-cell" title="${item.title}">${item.title}</td>
                 <td class="channel-cell">${item.uploader}</td>
@@ -431,9 +442,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 <td class="error-detail-cell" id="error-${item.id}" title="${state.error_detail}">${state.error_detail || "--"}</td>
             `;
             
-            row.querySelector(".video-checkbox").addEventListener("change", () => {
+            row.querySelector(".video-checkbox").addEventListener("change", (e) => {
+                if (e.target.checked) {
+                    selectedItemIds.add(item.id);
+                } else {
+                    selectedItemIds.delete(item.id);
+                }
                 updateSelectionMeta();
-                const allChecked = Array.from(document.querySelectorAll(".video-checkbox")).every(c => c.checked);
+                
+                // Recalculate header checkbox state
+                let allChecked = true;
+                pageItems.forEach(pi => {
+                    if (!selectedItemIds.has(pi.id)) allChecked = false;
+                });
                 headerCheckbox.checked = allChecked;
             });
 
@@ -473,31 +494,47 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Toggle all checkboxes
+    // Toggle all checkboxes on header click
     headerCheckbox.addEventListener("change", (e) => {
-        toggleAllCheckboxes(e.target.checked);
+        const checked = e.target.checked;
+        const query = playlistSearch.value.toLowerCase().trim();
+        const status = statusFilter.value;
+        
+        // Match only items within current search/filter view
+        const filtered = playlistItems.filter(item => {
+            const title = item.title.toLowerCase();
+            const channel = item.uploader.toLowerCase();
+            const state = localItemStates[item.id] || { status: "queued" };
+            const itemStatus = state.status || "queued";
+            
+            const matchesText = title.includes(query) || channel.includes(query);
+            const matchesStatus = (status === "all") || (itemStatus === status);
+            return matchesText && matchesStatus;
+        });
+
+        filtered.forEach(item => {
+            if (checked) {
+                selectedItemIds.add(item.id);
+            } else {
+                selectedItemIds.delete(item.id);
+            }
+        });
+
+        renderPlaylistTable(playlistItems);
         updateSelectionMeta();
     });
 
-    function toggleAllCheckboxes(checked) {
-        const checkboxes = document.querySelectorAll(".video-checkbox");
-        checkboxes.forEach(cb => {
-            const row = cb.closest("tr");
-            if (row && row.style.display !== "none") {
-                cb.checked = checked;
-            }
-        });
-    }
-
     selectAllBtn.addEventListener("click", () => {
-        toggleAllCheckboxes(true);
+        playlistItems.forEach(item => selectedItemIds.add(item.id));
         headerCheckbox.checked = true;
+        renderPlaylistTable(playlistItems);
         updateSelectionMeta();
     });
 
     deselectAllBtn.addEventListener("click", () => {
-        toggleAllCheckboxes(false);
+        selectedItemIds.clear();
         headerCheckbox.checked = false;
+        renderPlaylistTable(playlistItems);
         updateSelectionMeta();
     });
 
@@ -520,7 +557,7 @@ document.addEventListener("DOMContentLoaded", () => {
         
         let bytesPerSec = 0.024 * 1024 * 1024;
         if (format === "audio") {
-            const rates = { low: 0.008, medium: 0.016, font: 0.024, high: 0.024, highest: 0.04 };
+            const rates = { low: 0.008, medium: 0.016, high: 0.024, highest: 0.04 };
             bytesPerSec = (rates[quality] || 0.024) * 1024 * 1024;
         } else {
             const rates = { low: 0.05, medium: 0.1, high: 0.2, highest: 0.4 };
@@ -548,9 +585,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function getSelectedItems() {
-        const checkedCheckboxes = document.querySelectorAll(".video-checkbox:checked");
-        const actualIds = Array.from(checkedCheckboxes).map(cb => cb.getAttribute("data-id"));
-        return playlistItems.filter(item => actualIds.includes(item.id));
+        return playlistItems.filter(item => selectedItemIds.has(item.id));
     }
 
     // Interactive Sorting
