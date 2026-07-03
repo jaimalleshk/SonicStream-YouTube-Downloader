@@ -75,6 +75,23 @@ def sanitize_filename(filename: str) -> str:
         filename = filename.replace(char, '_')
     return filename
 
+def check_local_duplicate(title: str, format_type: str, download_dir: str) -> Optional[str]:
+    target_exts = [".mp3"] if format_type == "audio" else [".mp4", ".mkv", ".webm"]
+    # Prepare sanitized base name using yt-dlp rules
+    ydl = yt_dlp.YoutubeDL({'outtmpl': '%(title)s'})
+    sanitized_title = ydl.prepare_filename({'title': title})
+    
+    try:
+        if os.path.exists(download_dir):
+            files = os.listdir(download_dir)
+            for f in files:
+                name, ext = os.path.splitext(f)
+                if name.lower() == sanitized_title.lower() and ext.lower() in target_exts:
+                    return os.path.join(download_dir, f)
+    except Exception:
+        pass
+    return None
+
 # History Helpers
 def load_history():
     if not os.path.exists(HISTORY_FILE):
@@ -227,13 +244,11 @@ def run_download_job(job_data: dict):
             download_state["percentage"] = 0.0
             download_state["logs"].append(f"[{idx+1}/{len(request.items)}] Preparing: {item.title}")
 
-        # Check for local duplicates first
-        sanitized_title = sanitize_filename(item.title)
-        ext = "mp3" if request.format == "audio" else "mp4"
-        expected_path = os.path.join(DOWNLOAD_DIR, f"{sanitized_title}.{ext}")
+        # Check for local duplicates first using case-insensitive check and yt-dlp naming logic
+        duplicate_path = check_local_duplicate(item.title, request.format, DOWNLOAD_DIR)
         
-        if request.skip_duplicates and os.path.exists(expected_path):
-            skip_msg = f"[Duplicate Skipped] \"{sanitized_title}.{ext}\" already exists at: {expected_path}"
+        if request.skip_duplicates and duplicate_path:
+            skip_msg = f"[Duplicate Skipped] \"{os.path.basename(duplicate_path)}\" already exists at: {duplicate_path}"
             with progress_lock:
                 download_state["percentage"] = 100.0
                 download_state["logs"].append(skip_msg)
