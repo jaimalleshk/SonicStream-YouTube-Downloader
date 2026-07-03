@@ -30,6 +30,10 @@ document.addEventListener("DOMContentLoaded", () => {
     
     const openFolderBtn = document.getElementById("openFolderBtn");
 
+    // Download Folder selector elements
+    const downloadDirInput = document.getElementById("downloadDirInput");
+    const browseDirBtn = document.getElementById("browseDirBtn");
+
     // History elements
     const historyBtn = document.getElementById("historyBtn");
     const historyModal = document.getElementById("historyModal");
@@ -151,6 +155,39 @@ document.addEventListener("DOMContentLoaded", () => {
         // Dynamic size calculations based on selection formatting
         updateSelectionMeta();
     }
+
+    // Load initial default directory path
+    async function loadDefaultDir() {
+        try {
+            const res = await fetch("/api/settings/dir");
+            const data = await res.json();
+            if (data.download_dir) {
+                downloadDirInput.value = data.download_dir;
+            }
+        } catch (e) {
+            console.error("Error loading default directory:", e);
+        }
+    }
+    loadDefaultDir();
+
+    // Directory selector browse dialog mapping
+    browseDirBtn.addEventListener("click", async () => {
+        browseDirBtn.disabled = true;
+        const oldText = browseDirBtn.textContent;
+        browseDirBtn.textContent = "Browsing...";
+        try {
+            const res = await fetch("/api/settings/browse", { method: "POST" });
+            const data = await res.json();
+            if (data.download_dir) {
+                downloadDirInput.value = data.download_dir;
+            }
+        } catch (e) {
+            alert(`Failed to select folder: ${e.message}`);
+        } finally {
+            browseDirBtn.disabled = false;
+            browseDirBtn.textContent = oldText;
+        }
+    });
 
     // Analyze link
     analyzeBtn.addEventListener("click", analyzeLink);
@@ -425,11 +462,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function playLocalFile(title) {
         const format = document.querySelector('input[name="format"]:checked')?.value || "audio";
+        const downloadDir = downloadDirInput.value.trim();
         try {
             const res = await fetch("/api/play-file", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ title, format })
+                body: JSON.stringify({ title, format, download_dir: downloadDir })
             });
             if (!res.ok) {
                 const data = await res.json();
@@ -623,6 +661,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const format = document.querySelector('input[name="format"]:checked').value;
         const quality = document.querySelector('input[name="quality"]:checked').value;
         const skipDuplicates = skipDuplicatesCheckbox.checked;
+        const downloadDir = downloadDirInput.value.trim();
         
         const playlistTitleVal = playlistTitle.textContent;
         const playlistUrlVal = urlInput.value.trim();
@@ -657,7 +696,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     quality,
                     playlist_title: playlistTitleVal,
                     playlist_url: playlistUrlVal,
-                    skip_duplicates: skipDuplicates
+                    skip_duplicates: skipDuplicates,
+                    download_dir: downloadDir
                 })
             });
 
@@ -811,8 +851,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Opening downloads folder
     async function openLocalDownloadsFolder() {
+        const downloadDir = downloadDirInput.value.trim();
         try {
-            const res = await fetch("/api/open-folder", { method: "POST" });
+            const res = await fetch("/api/open-folder", { 
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ download_dir: downloadDir })
+            });
             if (!res.ok) {
                 const data = await res.json();
                 alert(`Error opening folder: ${data.detail}`);

@@ -71,6 +71,7 @@ class DownloadRequest(BaseModel):
     playlist_title: Optional[str] = None
     playlist_url: Optional[str] = None
     skip_duplicates: Optional[bool] = True
+    download_dir: Optional[str] = None
 
 # Helper: Sanitize windows filenames
 def sanitize_filename(filename: str) -> str:
@@ -81,7 +82,6 @@ def sanitize_filename(filename: str) -> str:
 
 def check_local_duplicate(title: str, format_type: str, download_dir: str) -> Optional[str]:
     target_exts = [".mp3"] if format_type == "audio" else [".mp4", ".mkv", ".webm"]
-    # Pure-python sanitization matching Windows rules
     sanitized_title = title
     for char in ['\\', '/', ':', '*', '?', '"', '<', '>', '|']:
         sanitized_title = sanitized_title.replace(char, '_')
@@ -211,6 +211,10 @@ def run_download_job(job_data: dict):
     job_num = job_data["job_num"]
     request = job_data["request"]
     
+    # Establish target custom directory
+    target_dir = request.download_dir or DOWNLOAD_DIR
+    os.makedirs(target_dir, exist_ok=True)
+    
     # Set active job in queue state
     with queue_lock:
         queue_state["active_job"] = {
@@ -219,7 +223,8 @@ def run_download_job(job_data: dict):
             "title": job_data["title"],
             "total_tracks": len(request.items),
             "format": request.format,
-            "quality": request.quality
+            "quality": request.quality,
+            "download_dir": target_dir
         }
         # Remove from pending list
         queue_state["pending_jobs"] = [j for j in queue_state["pending_jobs"] if j["job_id"] != job_id]
@@ -293,7 +298,7 @@ def run_download_job(job_data: dict):
                     download_state["logs"].append(f"Finished downloading: {title}")
 
         # Check for local duplicates first
-        duplicate_path = check_local_duplicate(item.title, request.format, DOWNLOAD_DIR)
+        duplicate_path = check_local_duplicate(item.title, request.format, target_dir)
         
         if request.skip_duplicates and duplicate_path:
             skip_msg = f"[Duplicate Skipped] \"{os.path.basename(duplicate_path)}\" already exists at: {duplicate_path}"
@@ -315,8 +320,8 @@ def run_download_job(job_data: dict):
             'quiet': True,
             'no_warnings': True,
             'progress_hooks': [progress_hook],
-            'outtmpl': os.path.join(DOWNLOAD_DIR, '%(title)s.%(ext)s'),
-            'download_archive': os.path.join(DOWNLOAD_DIR, 'download_archive.txt'),
+            'outtmpl': os.path.join(target_dir, '%(title)s.%(ext)s'),
+            'download_archive': os.path.join(target_dir, 'download_archive.txt'),
             'nooverwrites': True,
             'noplaylist': True,
             'writethumbnail': True,
@@ -437,6 +442,10 @@ worker_thread.start()
 
 @app.post("/api/download")
 async def start_download(req: DownloadRequest):
+    # Establish target custom directory
+    target_dir = req.download_dir or DOWNLOAD_DIR
+    os.makedirs(target_dir, exist_ok=True)
+    
     # Get incremental job number from history
     job_id = f"job_{int(time.time())}"
     timestamp = datetime.now().isoformat()
@@ -464,7 +473,8 @@ async def start_download(req: DownloadRequest):
             "failure_count": 0,
             "is_playlist": len(req.items) > 1 or req.playlist_url is not None,
             "format": req.format,
-            "quality": req.quality
+            "quality": req.quality,
+            "download_dir": target_dir
         }
         history.insert(0, new_entry)
         save_history(history)
@@ -495,7 +505,8 @@ async def get_queue():
                     "title": j["title"],
                     "total_tracks": len(j["request"].items),
                     "format": j["request"].format,
-                    "quality": j["request"].quality
+                    "quality": j["request"].quality,
+                    "download_dir": j["request"].download_dir
                 } for j in queue_state["pending_jobs"]
             ]
         }
@@ -574,6 +585,8 @@ async def resume_job(req: ResumeRequest):
     if not url:
         raise HTTPException(status_code=400, detail="Job does not have a URL associated")
 
+    original_dir = job.get("download_dir", DOWNLOAD_DIR)
+
     # 2. Extract playlist entries
     ydl_opts = {
         'extract_flat': True,
@@ -613,7 +626,8 @@ async def resume_job(req: ResumeRequest):
             quality=job.get("quality", "highest"),
             playlist_title=job.get("title"),
             playlist_url=url,
-            skip_duplicates=True
+            skip_duplicates=True,
+            download_dir=original_dir
         )
         
         # 4. Trigger download (push to queue)
@@ -640,7 +654,8 @@ async def resume_job(req: ResumeRequest):
                 "failure_count": 0,
                 "is_playlist": job.get("is_playlist", len(entries) > 1),
                 "format": job.get("format", "audio"),
-                "quality": job.get("quality", "highest")
+                "quality": job.get("quality", "highest"),
+                "download_dir": original_dir
             }
             history.insert(0, new_entry)
             save_history(history)
@@ -661,15 +676,20 @@ async def resume_job(req: ResumeRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Resumption failed: {str(e)}")
 
+class OpenFolderRequest(BaseModel):
+    download_dir: Optional[str] = None
+
 @app.post("/api/open-folder")
-async def open_folder():
+async def open_folder(req: OpenFolderRequest):
+    target_dir = req.download_dir or DOWNLOAD_DIR
+    os.makedirs(target_dir, exist_ok=True)
     try:
         if sys.platform == "win32":
-            os.startfile(DOWNLOAD_DIR)
+            os.startfile(target_dir)
         elif sys.platform == "darwin":
-            subprocess.Popen(["open", DOWNLOAD_DIR])
+            subprocess.Popen(["open", target_dir])
         else:
-            subprocess.Popen(["xdg-open", DOWNLOAD_DIR])
+            subprocess.Popen(["xdg-open", target_dir])
         return {"message": "Folder opened"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not open downloads directory: {str(e)}")
@@ -677,10 +697,12 @@ async def open_folder():
 class PlayRequest(BaseModel):
     title: str
     format: str
+    download_dir: Optional[str] = None
 
 @app.post("/api/play-file")
 async def play_file(req: PlayRequest):
-    duplicate_path = check_local_duplicate(req.title, req.format, DOWNLOAD_DIR)
+    target_dir = req.download_dir or DOWNLOAD_DIR
+    duplicate_path = check_local_duplicate(req.title, req.format, target_dir)
     if not duplicate_path or not os.path.exists(duplicate_path):
         raise HTTPException(status_code=404, detail="Local file not found. Ensure it has finished downloading.")
     try:
@@ -693,6 +715,30 @@ async def play_file(req: PlayRequest):
         return {"message": "Playing file"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to play file: {str(e)}")
+
+@app.get("/api/settings/dir")
+async def get_default_dir():
+    return {"download_dir": DOWNLOAD_DIR}
+
+@app.post("/api/settings/browse")
+async def browse_dir():
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True) # Force focus to front
+        
+        folder = filedialog.askdirectory(title="Select Download Directory")
+        root.destroy()
+        
+        if folder:
+            folder = os.path.normpath(folder)
+            return {"download_dir": folder}
+        return {"download_dir": None}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to open browse dialog: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
