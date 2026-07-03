@@ -344,23 +344,15 @@ document.addEventListener("DOMContentLoaded", () => {
             let totalJobs = data.pending_jobs.length;
             if (data.active_job) {
                 totalJobs += 1;
-                
-                // Show active job container, hide idle container
-                activeJobSection.style.display = "block";
-                activeJobIdleMessage.style.display = "none";
-                
                 // If EventSource is not listening, start it!
                 if (!currentEventSource) {
                     startProgressStream();
                 }
             } else {
-                // Hide active, show idle
-                activeJobSection.style.display = "none";
-                activeJobIdleMessage.style.display = "block";
-                
-                if (currentEventSource) {
-                    currentEventSource.close();
-                    currentEventSource = null;
+                // If no active job but we have no EventSource running,
+                // connect to fetch and display the last completed logs
+                if (!currentEventSource) {
+                    startProgressStream();
                 }
             }
 
@@ -397,6 +389,30 @@ document.addEventListener("DOMContentLoaded", () => {
                 progressPercent.textContent = `${data.percentage}%`;
                 progressSpeed.textContent = data.speed;
                 progressEta.textContent = data.eta;
+            } else if (data.status === "completed") {
+                // Ensure logs remain visible
+                activeJobSection.style.display = "block";
+                activeJobIdleMessage.style.display = "none";
+                
+                progressIndex.textContent = "All Done";
+                progressTitle.textContent = "Playlist completed successfully!";
+                progressFill.style.width = "100%";
+                progressPercent.textContent = "100%";
+                progressSpeed.textContent = "--";
+                progressEta.textContent = "--";
+            } else if (data.status === "failed") {
+                activeJobSection.style.display = "block";
+                activeJobIdleMessage.style.display = "none";
+                
+                progressIndex.textContent = "Failed";
+                progressTitle.textContent = data.error || "Fatal download error occurred";
+                progressFill.style.width = "0%";
+                progressPercent.textContent = "Error";
+                progressSpeed.textContent = "--";
+                progressEta.textContent = "--";
+            } else if (data.status === "idle") {
+                activeJobSection.style.display = "none";
+                activeJobIdleMessage.style.display = "block";
             }
 
             // Update Total Playlist Progress (downloaded vs pending count and overall progress bar)
@@ -423,7 +439,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 data.logs.forEach(log => {
                     const p = document.createElement("p");
                     p.textContent = log;
-                    if (log.startsWith("[System Error]") || log.startsWith("Error")) {
+                    if (log.startsWith("[System Error]") || log.startsWith("Error") || log.startsWith("Fatal worker error")) {
                         p.style.color = "var(--error)";
                     } else if (log.startsWith("Finished downloading")) {
                         p.style.color = "var(--success)";
