@@ -33,41 +33,6 @@
                 <span class="logo-badge">MVP</span>
             </div>
 
-            <!-- Inline Format & Quality Selectors in Header -->
-            <div class="header-config-group" style="display: flex; align-items: center; gap: 0.65rem;">
-                <!-- Format Pill Group -->
-                <div class="header-pill-group" style="display: flex; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px;">
-                    <label class="header-pill-btn active" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; color: var(--text-secondary); transition: var(--transition);">
-                        <input type="radio" name="format" value="audio" checked style="display: none;">
-                        Audio
-                    </label>
-                    <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; color: var(--text-secondary); transition: var(--transition);">
-                        <input type="radio" name="format" value="video" style="display: none;">
-                        Video
-                    </label>
-                </div>
-
-                <!-- Quality Pill Group -->
-                <div class="header-pill-group" style="display: flex; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px;">
-                    <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
-                        <input type="radio" name="quality" value="low" style="display: none;">
-                        Low
-                    </label>
-                    <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
-                        <input type="radio" name="quality" value="medium" style="display: none;">
-                        Med
-                    </label>
-                    <label class="header-pill-btn active" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
-                        <input type="radio" name="quality" value="high" checked style="display: none;">
-                        High
-                    </label>
-                    <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
-                        <input type="radio" name="quality" value="highest" style="display: none;">
-                        Max
-                    </label>
-                </div>
-            </div>
-
             <div class="header-actions" style="display: flex; align-items: center; gap: 0.75rem;">
                 <!-- Download Directory Inline Selector -->
                 <div class="header-directory-selector" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); padding: 0.35rem 0.75rem; border-radius: 8px;">
@@ -101,6 +66,41 @@
                 <h1>High-Speed Media Downloader</h1>
                 <p class="subtitle">Extract playlists or single videos into premium audio or video formats instantly.</p>
                 
+                <!-- Format & Quality Settings inside Hero Card -->
+                <div class="hero-config-row" style="display: flex; align-items: center; gap: 0.65rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Format:</span>
+                    <div class="header-pill-group" style="display: flex; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px;">
+                        <label class="header-pill-btn active" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; color: var(--text-secondary); transition: var(--transition);">
+                            <input type="radio" name="format" value="audio" checked style="display: none;">
+                            Audio
+                        </label>
+                        <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; color: var(--text-secondary); transition: var(--transition);">
+                            <input type="radio" name="format" value="video" style="display: none;">
+                            Video
+                        </label>
+                    </div>
+
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-left: 0.5rem;">Quality:</span>
+                    <div class="header-pill-group" style="display: flex; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px;">
+                        <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
+                            <input type="radio" name="quality" value="low" style="display: none;">
+                            Low
+                        </label>
+                        <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
+                            <input type="radio" name="quality" value="medium" style="display: none;">
+                            Med
+                        </label>
+                        <label class="header-pill-btn active" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
+                            <input type="radio" name="quality" value="high" checked style="display: none;">
+                            High
+                        </label>
+                        <label class="header-pill-btn" style="padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: var(--transition);">
+                            <input type="radio" name="quality" value="highest" style="display: none;">
+                            Max
+                        </label>
+                    </div>
+                </div>
+
                 <div class="input-group">
                     <div class="input-wrapper">
                         <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
