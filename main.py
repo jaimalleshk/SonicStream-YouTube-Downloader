@@ -9,6 +9,7 @@ import subprocess
 import threading
 from datetime import datetime
 from typing import List, Optional
+from urllib.parse import urlparse, parse_qs
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
@@ -124,11 +125,24 @@ def update_history_item(job_id: str, completed_count: int):
 async def read_index():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
+def get_clean_playlist_url(url: str) -> str:
+    try:
+        parsed = urlparse(url)
+        query = parse_qs(parsed.query)
+        if 'list' in query:
+            playlist_id = query['list'][0]
+            return f"https://www.youtube.com/playlist?list={playlist_id}"
+    except Exception:
+        pass
+    return url
+
 @app.post("/api/fetch-info")
 async def fetch_info(req: FetchRequest):
     url = req.url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL cannot be empty")
+    
+    url = get_clean_playlist_url(url)
 
     ydl_opts = {
         'extract_flat': True,
