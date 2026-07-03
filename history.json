@@ -1,5 +1,25 @@
 [
   {
+    "id": "job_1783038010",
+    "title": "Single Video",
+    "url": "https://www.youtube.com/watch?v=efv3iHUarxY&list=PLcqF0SS4XiHFvtqCcHdDHrKGw_r9aRCak",
+    "timestamp": "2026-07-02T19:20:10.228422",
+    "total_tracks": 1,
+    "completed_tracks": 1,
+    "format": "audio",
+    "quality": "medium"
+  },
+  {
+    "id": "job_1783037986",
+    "title": "Single Video",
+    "url": "https://www.youtube.com/watch?v=efv3iHUarxY&list=PLcqF0SS4XiHFvtqCcHdDHrKGw_r9aRCak",
+    "timestamp": "2026-07-02T19:19:46.099671",
+    "total_tracks": 1,
+    "completed_tracks": 1,
+    "format": "audio",
+    "quality": "medium"
+  },
+  {
     "id": "job_1783037423",
     "title": "Test Queue Playlist",
     "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",

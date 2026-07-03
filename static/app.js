@@ -295,7 +295,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error(data.detail || "Failed to queue download job");
             }
 
-            // Immediately poll queue to show the new item
+            // Immediately start progress stream and poll queue state
+            startProgressStream();
             updateQueueState();
 
         } catch (err) {
@@ -383,6 +384,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = JSON.parse(event.data);
             
             if (data.status === "downloading") {
+                // Ensure active view is visible and idle view is hidden
+                activeJobSection.style.display = "block";
+                activeJobIdleMessage.style.display = "none";
+                
                 progressIndex.textContent = `Item ${data.current_index} of ${data.total_files}`;
                 progressTitle.textContent = data.current_title;
                 progressFill.style.width = `${data.percentage}%`;
