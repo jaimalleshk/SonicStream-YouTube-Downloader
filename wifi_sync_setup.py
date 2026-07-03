@@ -26,7 +26,7 @@ def load_config():
         with open(SYNC_CONFIG_FILE, "r", encoding="utf-8") as f:
             cfg.update(json.load(f))
     if not cfg.get("token"):
-        cfg["token"] = secrets.token_hex(16)
+        cfg["token"] = secrets.token_hex(4)
     return cfg
 
 
@@ -75,7 +75,7 @@ if __name__ == "__main__":
         cfg["enabled"] = False
         save_config(cfg)
     elif action == "new-token":
-        cfg["token"] = secrets.token_hex(16)
+        cfg["token"] = secrets.token_hex(4)
         save_config(cfg)
         print("Pairing token rotated — re-pair the iPhone app.")
     elif action != "status":
