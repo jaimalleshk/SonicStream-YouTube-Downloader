@@ -141,7 +141,13 @@
                 <div class="playlist-header">
                     <div>
                         <h2 id="playlistTitle">YouTube Playlist</h2>
-                        <p class="meta" id="playlistMeta">0 items selected</p>
+                        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.25rem;">
+                            <p class="meta" id="playlistMeta" style="margin: 0;">0 items selected</p>
+                            <span style="color: var(--text-muted); font-size: 0.8rem;">|</span>
+                            <div id="activeQualityLabel" style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">
+                                Active Selection: <span id="activeFormatText" style="color: var(--neon-blue);">Audio</span> (<span id="activeQualityText" style="color: var(--neon-purple);">High</span>)
+                            </div>
+                        </div>
                     </div>
                     <div class="playlist-actions" style="display: flex; align-items: center; gap: 0.75rem;">
                         <div style="display: flex; align-items: center; gap: 0.5rem; margin-right: 0.5rem; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); padding: 0.4rem 0.8rem; border-radius: 8px;">
@@ -209,6 +215,20 @@
                             <!-- Items inserted dynamically -->
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Pagination controls -->
+                <div id="paginationControls" class="pagination-controls" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem; padding: 0.5rem 0.25rem; border-top: 1px solid var(--border-color); padding-top: 1rem; flex-wrap: wrap; gap: 1rem;">
+                    <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                        Showing <span id="paginationRange" style="font-weight: 700; color: var(--text-primary);">0 - 0</span> of <span id="paginationTotal" style="font-weight: 700; color: var(--text-primary);">0</span> items
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button class="btn btn-secondary btn-sm" id="btnFirstPage" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;">First</button>
+                        <button class="btn btn-secondary btn-sm" id="btnPrevPage" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;">Prev</button>
+                        <span style="font-size: 0.85rem; color: var(--text-secondary); margin: 0 0.5rem; font-weight: 600;" id="pageIndicator">Page 1 of 1</span>
+                        <button class="btn btn-secondary btn-sm" id="btnNextPage" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;">Next</button>
+                        <button class="btn btn-secondary btn-sm" id="btnLastPage" style="padding: 0.35rem 0.65rem; font-size: 0.8rem;">Last</button>
+                    </div>
                 </div>
 
                 <!-- Mini Console logs section inside the playlist card itself -->

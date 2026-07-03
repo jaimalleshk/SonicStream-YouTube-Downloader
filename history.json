@@ -1,5 +1,16 @@
 [
   {
+    "id": "job_1783039591",
+    "job_num": 2,
+    "title": "All Songs",
+    "url": "https://www.youtube.com/watch?v=efv3iHUarxY&list=PLcqF0SS4XiHFvtqCcHdDHrKGw_r9aRCak",
+    "timestamp": "2026-07-02T19:46:31.266474",
+    "total_tracks": 833,
+    "completed_tracks": 59,
+    "format": "audio",
+    "quality": "high"
+  },
+  {
     "id": "job_1783039296",
     "job_num": 1,
     "title": "Grid Diagnostic Run",

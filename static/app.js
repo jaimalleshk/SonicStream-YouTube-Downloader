@@ -37,12 +37,25 @@ document.addEventListener("DOMContentLoaded", () => {
     const clearHistoryBtn = document.getElementById("clearHistoryBtn");
     const historyList = document.getElementById("historyList");
 
+    // Pagination elements
+    const btnFirstPage = document.getElementById("btnFirstPage");
+    const btnPrevPage = document.getElementById("btnPrevPage");
+    const btnNextPage = document.getElementById("btnNextPage");
+    const btnLastPage = document.getElementById("btnLastPage");
+    const pageIndicator = document.getElementById("pageIndicator");
+    const paginationRange = document.getElementById("paginationRange");
+    const paginationTotal = document.getElementById("paginationTotal");
+
     // Global Caches for Interactive Grid Sorting & Live Sync
     let playlistItems = [];
     let localItemStates = {}; // Map of item.id -> { job_num, status, percentage, speed, start_time, end_time, error_detail }
     let currentEventSource = null;
     let currentSortCol = null;
     let sortAsc = true;
+
+    // Pagination State
+    let currentPage = 1;
+    const pageSize = 50;
 
     // Helper: format duration in seconds to MM:SS or H:MM:SS
     function formatDuration(seconds) {
@@ -64,6 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const activeLabel = e.target.closest(".toggle-option");
             if (activeLabel) activeLabel.classList.add("active");
             toggleQualityLabels(e.target.value);
+            updateActiveQualityLabel();
         });
     });
 
@@ -97,6 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
             qualityCards.forEach(c => c.classList.remove("active"));
             const activeCard = e.target.closest(".quality-card");
             if (activeCard) activeCard.classList.add("active");
+            updateActiveQualityLabel();
         });
     });
 
@@ -109,6 +124,27 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     });
+
+    function updateActiveQualityLabel() {
+        const format = document.querySelector('input[name="format"]:checked')?.value || "audio";
+        const quality = document.querySelector('input[name="quality"]:checked')?.value || "high";
+        
+        const formatText = format === "audio" ? "Audio (.mp3)" : "Video (.mp4)";
+        
+        let qualityText = "High";
+        if (format === "audio") {
+            const map = { low: "Low (64 kbps)", medium: "Medium (128 kbps)", high: "High (192 kbps)", highest: "Highest (320 kbps)" };
+            qualityText = map[quality] || "High (192 kbps)";
+        } else {
+            const map = { low: "Low (360p)", medium: "Medium (480p)", high: "High (720p)", highest: "Highest (1080p)" };
+            qualityText = map[quality] || "High (720p)";
+        }
+        
+        const formatTextEl = document.getElementById("activeFormatText");
+        const qualityTextEl = document.getElementById("activeQualityText");
+        if (formatTextEl) formatTextEl.textContent = formatText;
+        if (qualityTextEl) qualityTextEl.textContent = qualityText;
+    }
 
     // Analyze link
     analyzeBtn.addEventListener("click", analyzeLink);
@@ -132,6 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
         playlistSection.classList.add("hidden");
         playlistItems = [];
         localItemStates = {};
+        currentPage = 1;
 
         try {
             const response = await fetch("/api/fetch-info", {
@@ -182,14 +219,21 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderPlaylistTable(items) {
         playlistTableBody.innerHTML = "";
         
-        if (items.length === 0) {
-            playlistTableBody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-muted); padding: 2rem;">No videos found matching current filter.</td></tr>`;
-            return;
-        }
-
-        // Sort items array first
-        if (currentSortCol) {
-            items.sort((a, b) => {
+        // Sort items array: uncompleted items first, completed/skipped/error items last.
+        items.sort((a, b) => {
+            const stateA = localItemStates[a.id] || { status: "queued" };
+            const stateB = localItemStates[b.id] || { status: "queued" };
+            
+            const isDoneA = (stateA.status === "completed" || stateA.status === "skipped" || stateA.status === "error");
+            const isDoneB = (stateB.status === "completed" || stateB.status === "skipped" || stateB.status === "error");
+            
+            // Primary Sort: Active/Queued comes first, finished moves to bottom (last pages)
+            if (isDoneA !== isDoneB) {
+                return isDoneA ? 1 : -1;
+            }
+            
+            // Secondary Sort: header sort
+            if (currentSortCol) {
                 let valA = "";
                 let valB = "";
                 
@@ -203,9 +247,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     valA = a.duration || 0;
                     valB = b.duration || 0;
                 } else {
-                    const stateA = localItemStates[a.id] || {};
-                    const stateB = localItemStates[b.id] || {};
-                    
                     if (currentSortCol === "job_num") {
                         valA = stateA.job_num || 0;
                         valB = stateB.job_num || 0;
@@ -235,11 +276,78 @@ document.addEventListener("DOMContentLoaded", () => {
                 } else {
                     return sortAsc ? (valA - valB) : (valB - valA);
                 }
-            });
+            }
+            
+            // Tertiary Sort: default index order
+            return playlistItems.indexOf(a) - playlistItems.indexOf(b);
+        });
+
+        // Filter items
+        const query = playlistSearch.value.toLowerCase().trim();
+        const status = statusFilter.value;
+        
+        const filteredItems = items.filter(item => {
+            const title = item.title.toLowerCase();
+            const channel = item.uploader.toLowerCase();
+            const state = localItemStates[item.id] || { status: "queued" };
+            const itemStatus = state.status || "queued";
+            
+            const matchesText = title.includes(query) || channel.includes(query);
+            
+            let matchesStatus = false;
+            if (status === "all") {
+                matchesStatus = true;
+            } else if (status === "queued" && itemStatus === "queued") {
+                matchesStatus = true;
+            } else if (status === "downloading" && itemStatus === "downloading") {
+                matchesStatus = true;
+            } else if (status === "completed" && itemStatus === "completed") {
+                matchesStatus = true;
+            } else if (status === "skipped" && itemStatus === "skipped") {
+                matchesStatus = true;
+            } else if (status === "error" && itemStatus === "error") {
+                matchesStatus = true;
+            }
+            
+            return matchesText && matchesStatus;
+        });
+
+        const totalFiltered = filteredItems.length;
+        const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+        
+        // Boundaries checks
+        if (currentPage > totalPages) {
+            currentPage = totalPages;
+        }
+        
+        const startIdx = (currentPage - 1) * pageSize;
+        const endIdx = startIdx + pageSize;
+        const pageItems = filteredItems.slice(startIdx, endIdx);
+
+        // Update Pagination Controls Info
+        if (totalFiltered === 0) {
+            playlistTableBody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-muted); padding: 2rem;">No videos found matching current filter.</td></tr>`;
+            paginationRange.textContent = "0 - 0";
+            paginationTotal.textContent = "0";
+            pageIndicator.textContent = "Page 1 of 1";
+            btnFirstPage.disabled = true;
+            btnPrevPage.disabled = true;
+            btnNextPage.disabled = true;
+            btnLastPage.disabled = true;
+            return;
         }
 
-        // Render sorted rows
-        items.forEach(item => {
+        paginationRange.textContent = `${startIdx + 1} - ${Math.min(endIdx, totalFiltered)}`;
+        paginationTotal.textContent = totalFiltered;
+        pageIndicator.textContent = `Page ${currentPage} of ${totalPages}`;
+        
+        btnFirstPage.disabled = currentPage === 1;
+        btnPrevPage.disabled = currentPage === 1;
+        btnNextPage.disabled = currentPage === totalPages;
+        btnLastPage.disabled = currentPage === totalPages;
+
+        // Render pageItems rows
+        pageItems.forEach(item => {
             const state = localItemStates[item.id] || {
                 job_num: "--",
                 status: "queued",
@@ -287,9 +395,6 @@ document.addEventListener("DOMContentLoaded", () => {
             
             playlistTableBody.appendChild(row);
         });
-
-        // Trigger filters in case user sorted while filters were active
-        filterGrid();
     }
 
     // Toggle all checkboxes
@@ -332,7 +437,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return playlistItems.filter(item => selectedIds.includes(item.id));
     }
 
-    // Interactive Sorting logic
+    // Interactive Sorting
     const sortHeaders = document.querySelectorAll("th.sortable");
     sortHeaders.forEach(th => {
         th.addEventListener("click", () => {
@@ -353,24 +458,58 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // Combined Filters: Search + Status dropdown
-    playlistSearch.addEventListener("input", filterGrid);
-    statusFilter.addEventListener("change", filterGrid);
+    // Combined Filters: Search + Status dropdown (Resets to page 1)
+    playlistSearch.addEventListener("input", () => {
+        currentPage = 1;
+        renderPlaylistTable(playlistItems);
+    });
+    statusFilter.addEventListener("change", () => {
+        currentPage = 1;
+        renderPlaylistTable(playlistItems);
+    });
 
-    function filterGrid() {
+    // Pagination controls event binding
+    btnFirstPage.addEventListener("click", () => {
+        if (currentPage > 1) {
+            currentPage = 1;
+            renderPlaylistTable(playlistItems);
+        }
+    });
+
+    btnPrevPage.addEventListener("click", () => {
+        if (currentPage > 1) {
+            currentPage--;
+            renderPlaylistTable(playlistItems);
+        }
+    });
+
+    btnNextPage.addEventListener("click", () => {
         const query = playlistSearch.value.toLowerCase().trim();
         const status = statusFilter.value;
-        
-        const rows = playlistTableBody.querySelectorAll(".playlist-row");
-        rows.forEach(row => {
-            const id = row.getAttribute("data-id");
-            const item = playlistItems.find(i => i.id === id);
-            if (!item) return;
-            
+        const filteredCount = getFilteredCount(playlistItems, query, status);
+        const totalPages = Math.max(1, Math.ceil(filteredCount / pageSize));
+        if (currentPage < totalPages) {
+            currentPage++;
+            renderPlaylistTable(playlistItems);
+        }
+    });
+
+    btnLastPage.addEventListener("click", () => {
+        const query = playlistSearch.value.toLowerCase().trim();
+        const status = statusFilter.value;
+        const filteredCount = getFilteredCount(playlistItems, query, status);
+        const totalPages = Math.max(1, Math.ceil(filteredCount / pageSize));
+        if (currentPage < totalPages) {
+            currentPage = totalPages;
+            renderPlaylistTable(playlistItems);
+        }
+    });
+
+    function getFilteredCount(items, query, status) {
+        return items.filter(item => {
             const title = item.title.toLowerCase();
             const channel = item.uploader.toLowerCase();
-            
-            const state = localItemStates[id] || { status: "queued" };
+            const state = localItemStates[item.id] || { status: "queued" };
             const itemStatus = state.status || "queued";
             
             const matchesText = title.includes(query) || channel.includes(query);
@@ -389,13 +528,8 @@ document.addEventListener("DOMContentLoaded", () => {
             } else if (status === "error" && itemStatus === "error") {
                 matchesStatus = true;
             }
-            
-            if (matchesText && matchesStatus) {
-                row.style.display = "";
-            } else {
-                row.style.display = "none";
-            }
-        });
+            return matchesText && matchesStatus;
+        }).length;
     }
 
     // Start download process
@@ -492,15 +626,25 @@ document.addEventListener("DOMContentLoaded", () => {
             if (data.item_states) {
                 let completedCount = 0;
                 const totalCount = Object.keys(data.item_states).length;
+                let triggerTableRedraw = false;
 
                 Object.keys(data.item_states).forEach(id => {
                     const itemState = data.item_states[id];
+                    const oldState = localItemStates[id] || {};
                     
+                    const wasDone = (oldState.status === "completed" || oldState.status === "skipped" || oldState.status === "error");
+                    const isDone = (itemState.status === "completed" || itemState.status === "skipped" || itemState.status === "error");
+
+                    // Trigger pagination redraw to push done item to the last page!
+                    if (isDone && !wasDone) {
+                        triggerTableRedraw = true;
+                    }
+
                     // Cache state
                     localItemStates[id] = itemState;
                     
                     // Increment overall progress completed count
-                    if (itemState.status === "completed" || itemState.status === "skipped" || itemState.status === "error") {
+                    if (isDone) {
                         completedCount++;
                     }
 
@@ -531,6 +675,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
 
                 hudProgressCount.textContent = `${completedCount} / ${totalCount} Completed (Pending: ${totalCount - completedCount})`;
+
+                // If any item transitioned to completed/done, redraw the table to automatically move it to the last page!
+                if (triggerTableRedraw) {
+                    renderPlaylistTable(playlistItems);
+                }
             }
 
             // Render logs
@@ -720,6 +869,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const activeCard = initialQuality.closest(".quality-card");
             if (activeCard) activeCard.classList.add("active");
         }
+        // Initialize dynamic format/quality indicators on HUD
+        updateActiveQualityLabel();
     }
 
     function hideError() {
