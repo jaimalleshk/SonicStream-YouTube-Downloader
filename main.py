@@ -589,6 +589,7 @@ async def clear_history():
 
 class ResumeRequest(BaseModel):
     job_id: str
+    force_all: bool = False
 
 @app.post("/api/history/resume")
 async def resume_job(req: ResumeRequest):
@@ -650,12 +651,13 @@ async def resume_job(req: ResumeRequest):
             quality=job.get("quality", "highest"),
             playlist_title=job.get("title"),
             playlist_url=url,
-            skip_duplicates=True,
+            skip_duplicates=not req.force_all,
             download_dir=original_dir
         )
         
         # 4. Trigger download (push to queue)
         job_id = f"job_{int(time.time())}"
+        display_title = f"[Forced] {job.get('title')}" if req.force_all else f"[Resumed] {job.get('title')}"
         
         with history_lock:
             history = load_history()
@@ -669,7 +671,7 @@ async def resume_job(req: ResumeRequest):
             new_entry = {
                 "id": job_id,
                 "job_num": new_job_num,
-                "title": f"[Resumed] {job.get('title')}",
+                "title": display_title,
                 "url": url,
                 "timestamp": datetime.now().isoformat(),
                 "total_tracks": len(entries),
@@ -687,7 +689,7 @@ async def resume_job(req: ResumeRequest):
         job_data = {
             "job_id": job_id,
             "job_num": new_job_num,
-            "title": f"[Resumed] {job.get('title')}",
+            "title": display_title,
             "request": dl_req
         }
         

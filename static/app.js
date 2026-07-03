@@ -1009,12 +1009,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 <td style="color: #27c93f; font-weight: 700; font-family: var(--font-mono); text-align: center;">${successCount}</td>
                 <td style="color: var(--error); font-weight: 700; font-family: var(--font-mono); text-align: center;">${failureCount}</td>
                 <td>
-                    <div style="display: flex; gap: 0.4rem;">
-                        <button class="btn btn-secondary btn-sm load-grid-btn" data-url="${item.url}" style="padding: 0.35rem 0.6rem; font-size: 0.75rem;">
+                    <div style="display: flex; gap: 0.4rem; align-items: center;">
+                        <button class="btn btn-secondary btn-sm load-grid-btn" data-url="${item.url}" style="padding: 0.35rem 0.6rem; font-size: 0.75rem;" title="Load items into main grid">
                             Load Grid
                         </button>
-                        <button class="btn btn-primary btn-sm redownload-btn" data-id="${item.id}" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple)); border: none;">
+                        <button class="btn btn-primary btn-sm redownload-btn" data-id="${item.id}" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple)); border: none;" title="Resume / Download delta new items only">
                             Delta D/L
+                        </button>
+                        <button class="btn btn-secondary btn-sm force-all-btn" data-id="${item.id}" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; border: 1px solid var(--error); color: var(--error); background: transparent;" title="Force re-download all items in playlist">
+                            Force All
                         </button>
                     </div>
                 </td>
@@ -1035,7 +1038,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     const res = await fetch("/api/history/resume", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ job_id: jobId })
+                        body: JSON.stringify({ job_id: jobId, force_all: false })
                     });
                     if (res.ok) {
                         historyModal.classList.add("hidden");
@@ -1055,6 +1058,37 @@ document.addEventListener("DOMContentLoaded", () => {
                     alert(`Error: ${err.message}`);
                     e.target.disabled = false;
                     e.target.textContent = "Delta D/L";
+                }
+            });
+
+            row.querySelector(".force-all-btn").addEventListener("click", async (e) => {
+                const jobId = e.target.getAttribute("data-id");
+                e.target.disabled = true;
+                e.target.textContent = "Queueing...";
+                try {
+                    const res = await fetch("/api/history/resume", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ job_id: jobId, force_all: true })
+                    });
+                    if (res.ok) {
+                        historyModal.classList.add("hidden");
+                        
+                        // Clear grid status caches and redraw
+                        localItemStates = {};
+                        renderPlaylistTable(playlistItems);
+
+                        startProgressStream();
+                    } else {
+                        const err = await res.json();
+                        alert(`Failed to force download: ${err.detail}`);
+                        e.target.disabled = false;
+                        e.target.textContent = "Force All";
+                    }
+                } catch (err) {
+                    alert(`Error: ${err.message}`);
+                    e.target.disabled = false;
+                    e.target.textContent = "Force All";
                 }
             });
 
