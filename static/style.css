@@ -1405,11 +1405,12 @@ th {
     }
 }
 
-/* Active Job HUD (above playlist grid) */
+/* Active Job HUD (above playlist grid) - purple so it stands apart from the
+   blue playlist panels */
 .active-job-hud {
-    background: rgba(0, 242, 254, 0.04);
-    border: 1px solid rgba(0, 242, 254, 0.15);
-    border-top: 2px solid rgba(0, 242, 254, 0.3);
+    background: rgba(156, 39, 176, 0.08);
+    border: 1px solid rgba(156, 39, 176, 0.25);
+    border-top: 2px solid rgba(156, 39, 176, 0.5);
     border-radius: 8px;
     padding: 0.65rem 0.85rem;
     margin-bottom: 0.75rem;
@@ -1420,7 +1421,42 @@ th {
     flex-wrap: wrap;
 }
 
+.active-job-hud .pulse-ring {
+    background-color: var(--neon-purple);
+    box-shadow: 0 0 0 0 rgba(156, 39, 176, 0.7);
+}
+
 .active-job-hud.hidden {
     display: none;
+}
+
+/* Items grid: identical cell padding for header and rows so the select-all
+   checkbox lines up exactly with the row checkboxes */
+.playlist-table-wrapper th,
+.playlist-table-wrapper td {
+    padding: 0.5rem;
+    vertical-align: middle;
+    box-sizing: border-box;
+}
+
+.playlist-table-wrapper #headerCheckbox,
+.playlist-table-wrapper .video-checkbox {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    display: block;
+}
+
+/* Pagination buttons: blue when usable, grey only when there is no page to
+   go to */
+.pager-btn {
+    color: var(--neon-blue);
+    font-weight: 600;
+}
+
+.pager-btn:disabled {
+    color: #64748b;
+    cursor: default;
+    opacity: 0.7;
 }
 

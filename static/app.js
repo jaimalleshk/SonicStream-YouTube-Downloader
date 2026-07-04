@@ -317,6 +317,12 @@ document.addEventListener("DOMContentLoaded", () => {
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
                             </button>
                             ${!isVirtual ? `
+                            <button class="sidebar-row-btn move-up-btn" title="Move Up">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                            </button>
+                            <button class="sidebar-row-btn move-down-btn" title="Move Down">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                            </button>
                             <button class="sidebar-row-btn pin-sidebar-btn ${isPinned ? 'pinned-active' : ''}" title="${isPinned ? 'Unpin' : 'Pin'}">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
                             </button>
@@ -412,6 +418,30 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
                 
                 if (!isVirtual) {
+                    const moveJob = async (direction) => {
+                        try {
+                            const res = await fetch(`/api/history/${job.id}/move`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ direction })
+                            });
+                            if (res.ok) {
+                                const data = await res.json();
+                                if (data.moved) await loadSidebar();
+                            }
+                        } catch (err) {
+                            console.error("Failed to move playlist:", err);
+                        }
+                    };
+                    row.querySelector(".move-up-btn").addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        moveJob("up");
+                    });
+                    row.querySelector(".move-down-btn").addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        moveJob("down");
+                    });
+
                     row.querySelector(".pin-sidebar-btn").addEventListener("click", async (e) => {
                         e.stopPropagation();
                         try {
@@ -487,7 +517,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 speed: item.speed || "--",
                 start_time: item.start_time || "--",
                 end_time: item.end_time || "--",
-                error_detail: item.error_detail || ""
+                error_detail: item.error_detail || "",
+                file_missing: item.file_missing || false
             };
             selectedItemIds.add(item.id);
         });
@@ -671,23 +702,79 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    // Grid column sorting state (null key = original playlist order)
+    let gridSortKey = null;
+    let gridSortDir = 1;
+
+    function updateSortIndicators() {
+        document.querySelectorAll(".sortable-th").forEach(th => {
+            const ind = th.querySelector(".sort-ind");
+            if (ind) ind.textContent = th.dataset.sort === gridSortKey ? (gridSortDir === 1 ? " ▲" : " ▼") : "";
+        });
+    }
+
+    document.querySelectorAll(".sortable-th").forEach(th => {
+        th.style.cursor = "pointer";
+        th.title = "Sort by this column";
+        th.addEventListener("click", () => {
+            const key = th.dataset.sort;
+            if (gridSortKey === key) {
+                if (gridSortDir === 1) {
+                    gridSortDir = -1;
+                } else {
+                    // third click clears the sort back to playlist order
+                    gridSortKey = null;
+                    gridSortDir = 1;
+                }
+            } else {
+                gridSortKey = key;
+                gridSortDir = 1;
+            }
+            updateSortIndicators();
+            currentPage = 1;
+            renderPlaylistTable(playlistItems);
+        });
+    });
+
     // Render track rows in the Items Grid
     function renderPlaylistTable(items) {
         playlistTableBody.innerHTML = "";
-        
+
         const query = playlistSearch.value.toLowerCase().trim();
         const status = statusFilter.value;
-        
+
         const filteredItems = items.filter(item => {
             const title = item.title.toLowerCase();
             const channel = item.uploader.toLowerCase();
             const state = localItemStates[item.id] || { status: "queued" };
             const itemStatus = state.status || "queued";
-            
+
             const matchesText = title.includes(query) || channel.includes(query);
             const matchesStatus = (status === "all") || (itemStatus === status);
             return matchesText && matchesStatus;
         });
+
+        if (gridSortKey) {
+            const posMap = new Map(items.map((it, i) => [it.id, i]));
+            const sortVal = (item) => {
+                const state = localItemStates[item.id] || {};
+                switch (gridSortKey) {
+                    case "index": return posMap.get(item.id) || 0;
+                    case "title": return (item.title || "").toLowerCase();
+                    case "uploader": return (item.uploader || "").toLowerCase();
+                    case "duration": return item.duration || 0;
+                    case "status": return state.status || "queued";
+                    case "error": return state.error_detail || "";
+                    default: return 0;
+                }
+            };
+            filteredItems.sort((a, b) => {
+                const va = sortVal(a), vb = sortVal(b);
+                if (va < vb) return -gridSortDir;
+                if (va > vb) return gridSortDir;
+                return 0;
+            });
+        }
 
         const totalFiltered = filteredItems.length;
         const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
@@ -731,13 +818,14 @@ document.addEventListener("DOMContentLoaded", () => {
             row.className = "playlist-row";
             row.setAttribute("data-id", item.id);
             
-            const isPlayable = (state.status === "completed" || state.status === "skipped");
+            const isPlayable = (state.status === "completed" || (state.status === "skipped" && !state.file_missing));
             if (isPlayable) {
                 row.classList.add("playable");
             }
             
             const isChecked = selectedItemIds.has(item.id);
-            const displayStatus = state.status === "skipped" ? "Downloaded" : state.status;
+            // "skipped" only displays as Downloaded when the file is actually on disk
+            const displayStatus = state.status === "skipped" ? (state.file_missing ? "Skipped" : "Downloaded") : state.status;
             
             // Conditional action buttons rendering
             let actionButtons = "";
@@ -1067,8 +1155,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function isTrackDownloaded(track) {
-        const state = localItemStates[track.id] || {};
-        return state.status === "completed" || state.status === "skipped";
+        // localItemStates only covers the playlist currently open in the grid;
+        // for tracks of other playlists fall back to the track's own status.
+        const state = localItemStates[track.id];
+        const status = state ? state.status : track.status;
+        const fileMissing = state && ("file_missing" in state) ? state.file_missing : track.file_missing;
+        if (status === "skipped") return !fileMissing;
+        return status === "completed";
     }
 
     // Grid checkbox selection operations
@@ -1225,8 +1318,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
         currentEventSource.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            gridHud.classList.remove("hidden");
-            
+            // Never force the HUD open while the server is idle (reconnects)
+            if (data.status && data.status !== "idle") {
+                gridHud.classList.remove("hidden");
+            }
+
             if (data.status === "downloading") {
                 hudJobTitle.textContent = data.playlist_title || `Job #${data.active_job_num}`;
                 if (hudCurrentFile) hudCurrentFile.textContent = `↳ ${data.current_title}`;
@@ -1247,6 +1343,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (data.item_states) {
                 let completedCount = 0;
+                let successCount = 0; // completed/skipped only, same rule as the sidebar
                 const totalCount = Object.keys(data.item_states).length;
                 let triggerRedraw = false;
 
@@ -1262,6 +1359,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     localItemStates[id] = itemState;
                     if (isDone) completedCount++;
+                    if (itemState.status === "completed" || itemState.status === "skipped") successCount++;
 
                     const statusText = document.getElementById(`status-text-${id}`);
                     const fill = document.getElementById(`fill-${id}`);
@@ -1276,9 +1374,22 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 });
 
-                hudProgressCount.textContent = `${completedCount} / ${totalCount}`;
+                // Show job-wide progress (matches the sidebar numbers); fall back
+                // to session-queue counts for older payloads without the fields.
+                if (typeof data.job_total_tracks === "number" && data.job_total_tracks > 0) {
+                    hudProgressCount.textContent = `${(data.job_done_baseline || 0) + successCount} / ${data.job_total_tracks}`;
+                } else {
+                    hudProgressCount.textContent = `${completedCount} / ${totalCount}`;
+                }
                 if (triggerRedraw) {
                     renderPlaylistTable(playlistItems);
+                    // Keep sidebar counts in sync with the HUD during long jobs
+                    // (throttled: at most one refresh every 10s)
+                    const now = Date.now();
+                    if (!window._lastSidebarSyncAt || now - window._lastSidebarSyncAt > 10000) {
+                        window._lastSidebarSyncAt = now;
+                        loadSidebar();
+                    }
                 }
             }
 
@@ -1496,6 +1607,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 playTrack(nextTrack, playQueue, origIndex, sIdx, order);
             } else {
                 logToTerminal("[Player] Next track not found in shuffle queue.");
+                resetPlayerStatusIdle();
             }
         } else {
             let startIndex = currentTrackIndex;
@@ -1514,8 +1626,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 playTrack(playQueue[nextIndex], playQueue, nextIndex);
             } else {
                 logToTerminal("[Player] No downloaded tracks in queue to skip to.");
+                resetPlayerStatusIdle();
             }
         }
+    }
+
+    // Clears any leftover "Pause (Ns)..." text when playback cannot continue
+    function resetPlayerStatusIdle() {
+        if (playerStatusEq) {
+            playerStatusEq.style.visibility = "hidden";
+            playerStatusEq.classList.remove("playing");
+        }
+        if (playerStatusText) playerStatusText.textContent = "Ready";
+        isPlaying = false;
+        updatePlayBtnUI();
     }
 
     function playPrevTrack() {
@@ -1608,7 +1732,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         clearInterval(nextTrackCountdownInterval);
                         nextTrackCountdownInterval = null;
                     }
-                    playNextTrack();
+                    try {
+                        playNextTrack();
+                    } catch (e) {
+                        console.error("Auto-advance failed:", e);
+                        resetPlayerStatusIdle();
+                    }
                 }, pauseSecs * 1000);
             } else {
                 playNextTrack();
@@ -1616,16 +1745,30 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Time progress trackers
-    playerVideo.addEventListener("timeupdate", () => {
+    // Time progress trackers: a requestAnimationFrame loop while playing keeps
+    // the seek ball moving smoothly (timeupdate alone only fires ~4x/s).
+    let progressRafId = null;
+    function updateProgressUI() {
         if (playerVideo.duration) {
-            const current = playerVideo.currentTime;
-            const duration = playerVideo.duration;
-            playerProgressBar.value = (current / duration) * 100;
-            playerCurrentTime.textContent = formatDuration(current);
-            playerTotalTime.textContent = formatDuration(duration);
+            playerProgressBar.value = (playerVideo.currentTime / playerVideo.duration) * 100;
+            playerCurrentTime.textContent = formatDuration(playerVideo.currentTime);
+            playerTotalTime.textContent = formatDuration(playerVideo.duration);
         }
+    }
+    function progressLoop() {
+        updateProgressUI();
+        if (!playerVideo.paused && !playerVideo.ended) {
+            progressRafId = requestAnimationFrame(progressLoop);
+        } else {
+            progressRafId = null;
+        }
+    }
+    playerVideo.addEventListener("play", () => {
+        if (progressRafId) cancelAnimationFrame(progressRafId);
+        progressRafId = requestAnimationFrame(progressLoop);
     });
+    // Fallback for paused-state seeks and metadata loads
+    playerVideo.addEventListener("timeupdate", updateProgressUI);
 
     playerProgressBar.addEventListener("input", (e) => {
         if (playerVideo.duration) {
@@ -1980,6 +2123,9 @@ document.addEventListener("DOMContentLoaded", () => {
     loadDefaultDir();
     loadSidebar();
     initResizableColumns();
+    // Reattach to an in-flight download after a page reload/app restart so the
+    // Active Job HUD keeps reporting progress (harmless when idle).
+    startProgressStream();
 
     // Settings Modal Triggers
     const btnOpenSettings = document.getElementById("btnOpenSettings");
@@ -2108,6 +2254,64 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             } catch (e) {
                 syncManifestStatus.textContent = "Export failed";
+            }
+        });
+    }
+
+    // Playlists backup: export/import all playlists
+    const btnExportPlaylists = document.getElementById("btnExportPlaylists");
+    const btnImportPlaylists = document.getElementById("btnImportPlaylists");
+    const importPlaylistsFile = document.getElementById("importPlaylistsFile");
+    const backupStatusText = document.getElementById("backupStatusText");
+
+    if (btnExportPlaylists) {
+        btnExportPlaylists.addEventListener("click", async () => {
+            backupStatusText.textContent = "Exporting…";
+            try {
+                const res = await fetch("/api/playlists/export", { method: "POST" });
+                if (res.ok) {
+                    const data = await res.json();
+                    backupStatusText.textContent = `Exported ${data.playlists} playlist(s) to ${data.path}`;
+                    logToTerminal(`[Backup] Playlists exported to ${data.path}`);
+                } else {
+                    backupStatusText.textContent = "Export failed";
+                }
+            } catch (e) {
+                backupStatusText.textContent = "Export failed";
+            }
+        });
+    }
+
+    if (btnImportPlaylists && importPlaylistsFile) {
+        btnImportPlaylists.addEventListener("click", () => importPlaylistsFile.click());
+
+        importPlaylistsFile.addEventListener("change", async () => {
+            const file = importPlaylistsFile.files && importPlaylistsFile.files[0];
+            importPlaylistsFile.value = ""; // allow re-selecting the same file
+            if (!file) return;
+
+            backupStatusText.textContent = "Importing…";
+            try {
+                const text = await file.text();
+                const backup = JSON.parse(text);
+                const playlists = Array.isArray(backup) ? backup : backup.playlists;
+                if (!Array.isArray(playlists)) throw new Error("Not a playlists backup file");
+
+                const res = await fetch("/api/playlists/import-all", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ playlists })
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.detail || "Import failed");
+                }
+                const data = await res.json();
+                backupStatusText.textContent = `Imported ${data.imported} new, merged ${data.merged} existing (${data.tracks_added} tracks added)`;
+                logToTerminal(`[Backup] Import done: ${data.imported} new, ${data.merged} merged, ${data.tracks_added} tracks added.`);
+                await loadSidebar();
+            } catch (e) {
+                backupStatusText.textContent = `Import failed: ${e.message}`;
             }
         });
     }

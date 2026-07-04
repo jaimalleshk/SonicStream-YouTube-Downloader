@@ -6,3 +6,8 @@ __pycache__/
 .idea/
 *.log
 sync_config.json
+history.json.bak
+history.json.tmp
+history.json*.corrupt-*
+history-manual-backup-*.json
+history-git-head.tmp.json

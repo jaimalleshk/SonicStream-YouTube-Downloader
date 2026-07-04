@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import time
+import shutil
 import socket
 import queue
 import asyncio
@@ -12,7 +13,7 @@ from typing import List, Optional
 from urllib.parse import urlparse, parse_qs
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
+from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse, JSONResponse
 from pydantic import BaseModel
 import yt_dlp
 
@@ -46,7 +47,9 @@ download_state = {
     "logs": [],
     "error_message": "",
     "item_states": {},      # Map of item.id -> status, percent, speed, etc.
-    "active_job_num": 0
+    "active_job_num": 0,
+    "job_done_baseline": 0, # tracks already done in the job before this run
+    "job_total_tracks": 0   # total tracks in the whole job (not just this run)
 }
 
 # Queue Management
@@ -96,6 +99,23 @@ class ImportFolderRequest(BaseModel):
 
 
 import re
+
+# Permanent YouTube failures: retrying these can never succeed, so they get a
+# terminal "unavailable" status instead of "error" and are excluded from
+# auto-resume (a Force All / manual selection can still retry them).
+PERMANENT_DL_ERROR_PATTERNS = (
+    "video unavailable",
+    "private video",
+    "account associated with this video has been terminated",
+    "no longer available",
+    "video has been removed",
+    "blocked it in your country",
+    "blocked in your country",
+)
+
+def is_permanent_download_error(msg: str) -> bool:
+    m = (msg or "").lower()
+    return any(p in m for p in PERMANENT_DL_ERROR_PATTERNS)
 
 def clean_ansi(text: str) -> str:
     if not text:
@@ -155,21 +175,69 @@ def check_local_duplicate(title: str, format_type: str, download_dir: str) -> Op
     return None
 
 # History Helpers
-def load_history():
-    if not os.path.exists(HISTORY_FILE):
-        return []
-    try:
-        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return []
+#
+# history.json is the single source of truth for every playlist, so it must
+# survive process kills mid-write and OneDrive locking the file. Writes go to
+# a temp file first and are swapped in with os.replace (atomic on NTFS); the
+# previous good version is kept as history.json.bak and used as a fallback
+# when the main file is corrupt. A corrupt main file is preserved as
+# history.json.corrupt-* for forensics instead of being silently discarded.
 
-def save_history(history):
+def load_history():
+    for path in (HISTORY_FILE, HISTORY_FILE + ".bak"):
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                if path != HISTORY_FILE:
+                    print(f"[History] Main file unreadable - recovered from backup {path}")
+                return data
+        except Exception as e:
+            print(f"[History] Failed to read {path}: {e}")
+            try:
+                corrupt_copy = f"{path}.corrupt-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                if not os.path.exists(corrupt_copy):
+                    shutil.copy2(path, corrupt_copy)
+                    print(f"[History] Corrupt file preserved as {corrupt_copy}")
+            except Exception:
+                pass
+    return []
+
+def save_history(history, allow_empty=False):
     try:
-        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+        if not history and not allow_empty:
+            # An empty list here almost always means a failed load, not a real
+            # clear - refuse to wipe a non-empty file (clear_history passes
+            # allow_empty=True explicitly).
+            try:
+                if os.path.exists(HISTORY_FILE) and os.path.getsize(HISTORY_FILE) > 10:
+                    print("[History] Refusing to overwrite non-empty history with an empty list")
+                    return
+            except OSError:
+                return
+
+        tmp_path = HISTORY_FILE + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(history, f, indent=2, ensure_ascii=False)
-    except Exception:
-        pass
+            f.flush()
+            os.fsync(f.fileno())
+
+        # Retry the swaps briefly: OneDrive/AV can hold transient locks on Windows.
+        for attempt in range(3):
+            try:
+                if os.path.exists(HISTORY_FILE):
+                    os.replace(HISTORY_FILE, HISTORY_FILE + ".bak")
+                os.replace(tmp_path, HISTORY_FILE)
+                return
+            except OSError as e:
+                if attempt == 2:
+                    print(f"[History] Save failed after retries: {e}")
+                else:
+                    time.sleep(0.05)
+    except Exception as e:
+        print(f"[History] Save failed: {e}")
 
 def update_history_track_status(job_id: str, track_id: str, status: str, percentage: float, speed: str = "--", start_time: str = None, end_time: str = None, error_detail: str = ""):
     with history_lock:
@@ -193,7 +261,7 @@ def update_history_track_status(job_id: str, track_id: str, status: str, percent
                 
                 # Recompute job counts
                 success = sum(1 for t in items if t.get("status") in ["completed", "skipped"])
-                failures = sum(1 for t in items if t.get("status") == "error")
+                failures = sum(1 for t in items if t.get("status") in ["error", "unavailable"])
                 job["success_count"] = success
                 job["failure_count"] = failures
                 job["completed_tracks"] = success + failures
@@ -391,6 +459,23 @@ def run_download_job(job_data: dict):
             "error_detail": ""
         }
 
+    # Job-wide progress baseline so the HUD "Overall" counter matches the
+    # sidebar (success/total of the whole playlist, not just this run's queue)
+    req_ids = {item.id for item in request.items}
+    job_done_baseline = 0
+    job_total_tracks = len(request.items)
+    with history_lock:
+        hist = load_history()
+        job_entry = next((j for j in hist if j.get("id") == job_id), None)
+    if job_entry:
+        job_items = job_entry.get("items", [])
+        if job_items:
+            job_total_tracks = len(job_items)
+            job_done_baseline = sum(
+                1 for t in job_items
+                if t.get("status") in ("completed", "skipped") and t.get("id") not in req_ids
+            )
+
     with progress_lock:
         download_state.update({
             "status": "downloading",
@@ -404,7 +489,9 @@ def run_download_job(job_data: dict):
             "logs": [f"Starting Job #{job_num}: {job_data['title']}"],
             "error_message": "",
             "item_states": item_states,
-            "active_job_num": job_num
+            "active_job_num": job_num,
+            "job_done_baseline": job_done_baseline,
+            "job_total_tracks": job_total_tracks
         })
 
     success_count = 0
@@ -609,6 +696,13 @@ def run_download_job(job_data: dict):
                 import traceback
                 traceback.print_exc()
                 error_msg = str(e)
+                if is_permanent_download_error(error_msg):
+                    # Dead on YouTube's side - retrying cannot help
+                    with progress_lock:
+                        download_state["logs"].append(
+                            f"[Unavailable] {item.title} - permanent YouTube error, skipping retries"
+                        )
+                    break
                 if attempt < max_retries - 1:
                     with progress_lock:
                         download_state["logs"].append(
@@ -633,12 +727,16 @@ def run_download_job(job_data: dict):
                 end_time=datetime.now().strftime("%H:%M:%S")
             )
         else:
-            error_str = f"Error downloading {item.title} after {max_retries} attempts: {error_msg}"
+            final_status = "unavailable" if is_permanent_download_error(error_msg) else "error"
+            if final_status == "unavailable":
+                error_str = f"Unavailable on YouTube (will not be retried): {item.title}"
+            else:
+                error_str = f"Error downloading {item.title} after {max_retries} attempts: {error_msg}"
             with progress_lock:
                 download_state["logs"].append(error_str)
                 if item.id in download_state["item_states"]:
                     download_state["item_states"][item.id].update({
-                        "status": "error",
+                        "status": final_status,
                         "end_time": datetime.now().strftime("%H:%M:%S"),
                         "error_detail": error_msg
                     })
@@ -646,7 +744,7 @@ def run_download_job(job_data: dict):
             update_history_track_status(
                 job_id=job_id,
                 track_id=item.id,
-                status="error",
+                status=final_status,
                 percentage=0.0,
                 end_time=datetime.now().strftime("%H:%M:%S"),
                 error_detail=error_msg
@@ -860,7 +958,7 @@ async def start_download(req: DownloadRequest):
                         for item in req.items
                     ]
                 }
-                history.insert(0, new_entry)
+                history.append(new_entry)  # new playlists go to the end of the display order
                 save_history(history)
                 req_queued = req
 
@@ -919,6 +1017,8 @@ async def get_progress_stream():
                 err = download_state["error_message"]
                 item_states = dict(download_state["item_states"])
                 active_job_num = download_state["active_job_num"]
+                job_done_baseline = download_state.get("job_done_baseline", 0)
+                job_total_tracks = download_state.get("job_total_tracks", 0)
 
             payload = {
                 "status": status,
@@ -932,7 +1032,9 @@ async def get_progress_stream():
                 "logs": logs[-15:],
                 "error": err,
                 "item_states": item_states,
-                "active_job_num": active_job_num
+                "active_job_num": active_job_num,
+                "job_done_baseline": job_done_baseline,
+                "job_total_tracks": job_total_tracks
             }
             yield f"data: {json.dumps(payload)}\n\n"
             
@@ -1058,13 +1160,51 @@ async def get_history():
             }
             history.append(deleted_tracks_job)
             save_history(history)
-            
+
+        # 2.5. One-time migration: errored tracks whose error text is a permanent
+        # YouTube failure become "unavailable" so auto-resume stops retrying them.
+        migrated_unavailable = False
+        for job in history:
+            job_changed = False
+            for item in job.get("items", []):
+                if item.get("status") == "error" and is_permanent_download_error(item.get("error_detail", "")):
+                    item["status"] = "unavailable"
+                    job_changed = True
+            if job_changed:
+                migrated_unavailable = True
+                items = job.get("items", [])
+                job["success_count"] = sum(1 for t in items if t.get("status") in ["completed", "skipped"])
+                job["failure_count"] = sum(1 for t in items if t.get("status") in ["error", "unavailable"])
+        if migrated_unavailable:
+            save_history(history)
+
+        # 3. Annotate skipped tracks with file presence (response-only, not saved):
+        # "skipped" means the downloader assumed the file was already on disk -
+        # if it is not actually there, the UI shows "Skipped" instead of
+        # "Downloaded" and the player will not try to play it.
+        dir_indexes = {}
+        for job in history:
+            if job.get("deleted") or job.get("id") == "deleted_tracks":
+                continue
+            if job.get("format", "audio") != "audio":
+                continue
+            if not any(item.get("status") == "skipped" for item in job.get("items", [])):
+                continue
+            target_dir = job.get("download_dir") or DOWNLOAD_DIR
+            if target_dir not in dir_indexes:
+                dir_indexes[target_dir] = _build_file_index(target_dir)
+            index = dir_indexes[target_dir]
+            for item in job.get("items", []):
+                if item.get("status") == "skipped":
+                    title = item.get("title", "")
+                    item["file_missing"] = not (title and _clean_fuzzy_sync(title) in index)
+
         return [all_downloads_job] + history
 
 @app.post("/api/history/clear")
 async def clear_history():
     with history_lock:
-        save_history([])
+        save_history([], allow_empty=True)
     return {"message": "History cleared"}
 
 class ResumeRequest(BaseModel):
@@ -1184,10 +1324,11 @@ async def resume_job(req: ResumeRequest):
                             "error_detail": ""
                         })
 
-            # Reset status of items that need downloading
+            # Reset status of items that need downloading. "unavailable" is
+            # terminal (dead on YouTube) - only Force All retries those.
             tracks_to_download = []
             for track in target_job["items"]:
-                is_done = track.get("status") in ["completed", "skipped"]
+                is_done = track.get("status") in ["completed", "skipped", "unavailable"]
                 if req.force_all or not is_done:
                     track["status"] = "queued"
                     track["percentage"] = 0.0
@@ -1325,6 +1466,32 @@ async def pin_job(job_id: str):
         save_history(history)
     return {"message": "Job pin status toggled", "pinned": pinned_state}
 
+class MoveRequest(BaseModel):
+    direction: str  # "up" or "down"
+
+@app.post("/api/history/{job_id}/move")
+async def move_job(job_id: str, req: MoveRequest):
+    """Reorders playlists in the sidebar. Display order == position in
+    history.json, so moving swaps with the neighboring visible playlist."""
+    if req.direction not in ("up", "down"):
+        raise HTTPException(status_code=400, detail="direction must be 'up' or 'down'")
+    with history_lock:
+        history = load_history()
+        # Orderable = what the sidebar's active tabs show (trash excluded)
+        orderable = [i for i, j in enumerate(history)
+                     if not j.get("deleted") and j.get("id") != "deleted_tracks"]
+        pos = next((k for k, i in enumerate(orderable)
+                    if history[i].get("id") == job_id), None)
+        if pos is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        swap = pos - 1 if req.direction == "up" else pos + 1
+        if swap < 0 or swap >= len(orderable):
+            return {"message": "Already at the edge", "moved": False}
+        i, k = orderable[pos], orderable[swap]
+        history[i], history[k] = history[k], history[i]
+        save_history(history)
+    return {"message": "Moved", "moved": True}
+
 @app.delete("/api/history/{job_id}")
 async def delete_job(job_id: str):
     with history_lock:
@@ -1360,6 +1527,129 @@ async def restore_job(job_id: str):
         save_history(history)
     return {"message": "Playlist restored successfully"}
 
+# --- Playlist backup: export/import all playlists --------------------------
+# Recovery path for history.json loss: export writes a full snapshot of every
+# playlist (incl. pins, download_dir, track states) into the downloads folder;
+# import merges such a snapshot back, re-verifying every track against the
+# files already on disk so previously downloaded songs stay playable.
+
+class ImportPlaylistsRequest(BaseModel):
+    playlists: List[dict]
+    version: Optional[int] = 1
+
+def _recount_job(job: dict):
+    items = job.get("items", [])
+    job["total_tracks"] = len(items)
+    job["success_count"] = sum(1 for t in items if t.get("status") in ("completed", "skipped"))
+    job["failure_count"] = sum(1 for t in items if t.get("status") in ("error", "unavailable"))
+    job["completed_tracks"] = job["success_count"] + job["failure_count"]
+
+@app.post("/api/playlists/export")
+async def export_playlists():
+    with history_lock:
+        history = load_history()
+    playlists = [j for j in history if j.get("id") != "all_downloads"]
+    payload = {
+        "app": "SonicStream",
+        "type": "playlists_backup",
+        "version": 1,
+        "exported_at": datetime.now().isoformat(),
+        "playlists": playlists,
+    }
+    filename = f"sonicstream_playlists_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    out_path = os.path.join(DOWNLOAD_DIR, filename)
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    return {"message": "Playlists exported", "path": out_path, "playlists": len(playlists)}
+
+@app.post("/api/playlists/import-all")
+async def import_all_playlists(req: ImportPlaylistsRequest):
+    imported = 0
+    merged = 0
+    tracks_added = 0
+    dir_indexes: dict = {}
+
+    def _verify_against_disk(items: list, download_dir: str, fmt: str):
+        # Disk is the source of truth: tracks whose file exists become playable
+        # ("skipped" = present without re-download), missing ones go back to
+        # queued so Download Selected can fetch them again.
+        if fmt != "audio":
+            return
+        if download_dir not in dir_indexes:
+            dir_indexes[download_dir] = _build_file_index(download_dir)
+        index = dir_indexes[download_dir]
+        for t in items:
+            title = t.get("title", "")
+            found = bool(title) and _clean_fuzzy_sync(title) in index
+            if found:
+                if t.get("status") not in ("completed", "skipped"):
+                    t["status"] = "skipped"
+                    t["percentage"] = 100.0
+                t["file_missing"] = False
+            elif t.get("status") in ("completed", "skipped"):
+                t["status"] = "queued"
+                t["percentage"] = 0.0
+
+    with history_lock:
+        history = load_history()
+        by_id = {j.get("id"): j for j in history}
+        by_url = {j.get("url"): j for j in history if j.get("url")}
+        # Manual/folder playlists have no URL - match those by title so a
+        # re-import never duplicates a playlist the user already recreated.
+        by_title_no_url = {j.get("title"): j for j in history
+                           if not j.get("url") and j.get("title")}
+        new_jobs = []
+
+        for pj in req.playlists:
+            if not isinstance(pj, dict) or not pj.get("id"):
+                continue
+            if pj.get("id") == "all_downloads":
+                continue
+            if pj.get("deleted") and not pj.get("items"):
+                continue  # empty trashed jobs are not worth restoring
+
+            fmt = pj.get("format", "audio")
+            pdir = pj.get("download_dir") or DOWNLOAD_DIR
+            target = by_id.get(pj["id"])
+            if target is None and pj.get("url"):
+                target = by_url.get(pj["url"])
+            if target is None and not pj.get("url"):
+                target = by_title_no_url.get(pj.get("title"))
+
+            if target is None:
+                job = dict(pj)
+                job.setdefault("items", [])
+                job.setdefault("is_playlist", True)
+                job["download_dir"] = pdir
+                _verify_against_disk(job["items"], pdir, fmt)
+                _recount_job(job)
+                new_jobs.append(job)
+                by_id[job["id"]] = job
+                if job.get("url"):
+                    by_url[job["url"]] = job
+                elif job.get("title"):
+                    by_title_no_url[job["title"]] = job
+                imported += 1
+            else:
+                existing_ids = {t.get("id") for t in target.get("items", [])}
+                incoming = [t for t in pj.get("items", []) if t.get("id") not in existing_ids]
+                if incoming:
+                    _verify_against_disk(incoming, target.get("download_dir") or pdir,
+                                         target.get("format", fmt))
+                    target.setdefault("items", []).extend(incoming)
+                    tracks_added += len(incoming)
+                if pj.get("pinned"):
+                    target["pinned"] = True
+                _recount_job(target)
+                merged += 1
+
+        # New playlists keep their backup order, appended at the end of the
+        # display order (same rule as newly created playlists).
+        history = history + new_jobs
+        save_history(history)
+
+    return {"imported": imported, "merged": merged, "tracks_added": tracks_added}
+
 @app.post("/api/playlists/create")
 async def create_playlist(req: CreatePlaylistRequest):
     with history_lock:
@@ -1387,7 +1677,7 @@ async def create_playlist(req: CreatePlaylistRequest):
             "deleted": False,
             "is_playlist": True
         }
-        history.insert(0, new_job)
+        history.append(new_job)  # new playlists go to the end of the display order
         save_history(history)
     return new_job
 
@@ -1452,7 +1742,7 @@ async def import_playlist(req: ImportFolderRequest):
             # (and any DOWNLOAD_DIR-based lookup) can't resolve their files.
             "download_dir": os.path.normpath(req.folder_path)
         }
-        history.insert(0, new_job)
+        history.append(new_job)  # new playlists go to the end of the display order
         save_history(history)
     return new_job
 

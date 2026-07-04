@@ -142,3 +142,108 @@ position the phone app as paired-with-server but standalone-capable — point it
 at a folder and import `playlists_manifest.json` (schema v1, same contract as
 Wi-Fi Sync). Pipeline: direct YouTube sync with ~2-track lookahead (no full
 pre-download), then OneDrive/Google Drive via their APIs.
+
+## Session 2026-07-04: history.json data-loss postmortem + fixes
+
+**Incident:** user lost all playlists (incl. pins) overnight; re-added ones
+kept vanishing while new downloads ran.
+
+**Root cause:** `save_history()` wrote history.json non-atomically (truncate
+then dump, ~600 KB, once per progress tick during downloads) and
+`load_history()` silently returned `[]` on any parse error. Killing the
+process mid-write (app close during a download; also the preview-server stop
+in the previous session) left a truncated file → next load returned `[]` →
+the next save persisted the empty list. Repeated wipes while re-adding were
+the same cycle. OneDrive locking the file is an aggravating factor.
+
+**Fixes in `main.py` (history helpers):**
+- Atomic saves: dump to `history.json.tmp` + fsync, then `os.replace` swap
+  (with a short retry for OneDrive/AV locks). Truncation now impossible.
+- `history.json.bak` keeps the previous good version on every save;
+  `load_history()` falls back to it and preserves the corrupt main file as
+  `history.json.corrupt-<ts>` for forensics.
+- `save_history([])` is refused unless `allow_empty=True` (only
+  `/api/history/clear` passes it) — a failed load can no longer wipe the file.
+- All unit-tested (roundtrip, .bak rotation, corrupt fallback, empty-save
+  guard, explicit clear).
+
+**New: playlists backup/restore (Settings → Playlists Backup):**
+- `POST /api/playlists/export` → writes
+  `sonicstream_playlists_backup_<ts>.json` into the downloads folder
+  (all playlists incl. pins, download_dir, track states).
+- `POST /api/playlists/import-all` → merges a backup: new playlists appended,
+  existing matched by id **or URL** (tracks deduped by track id, pins
+  restored), and every incoming track re-verified against files on disk —
+  found → `skipped` (playable), missing → `queued` (re-downloadable).
+- Recovery executed: imported the git-HEAD history.json via this endpoint —
+  restored "English songs" (14/15 on disk), "Sync Test" (4/4) and Bhakthi's
+  pin. Manual backup kept as `history-manual-backup-*.json` (gitignored).
+
+**Other fixes this session:**
+- HUD "Overall" now shows job-wide progress (baseline of already-done tracks
+  + this run, over the job's full track count) via new SSE fields
+  `job_done_baseline`/`job_total_tracks` — it previously showed
+  session-queue-only numbers (user saw 145/779 vs sidebar 591/833).
+  Sidebar also refreshes (throttled 10s) during downloads, and the page
+  reattaches to an in-flight download's progress stream on load.
+- Skipped tracks: `get_history` annotates `file_missing` (fuzzy filename
+  index per download_dir, same rule as the sync manifest); UI shows
+  "Skipped" instead of "Downloaded" when the file is not actually on disk,
+  and the player treats such tracks as not downloaded.
+- Pause counter stuck at "Pause (1s)": `isTrackDownloaded()` only consulted
+  `localItemStates` (rebuilt for whichever playlist is open in the grid), so
+  auto-advance found "no downloaded tracks" after browsing another playlist
+  and silently gave up. It now falls back to the track's own `status`, and
+  all no-next-track paths reset the player status text ("Ready").
+- `.gitignore`: history backup/tmp/corrupt artifacts excluded.
+
+**Schema note:** track dicts in `/api/history` responses may now carry a
+transient `file_missing` bool (not persisted). Backup files use
+`{app, type: "playlists_backup", version: 1, exported_at, playlists: [...]}`
+— treat as a contract like the sync manifest.
+
+## Session 2026-07-04 (later): GitHub issues #4–#13, restore hang + UI batch
+
+All work tracked as GitHub issues (jaimalleshk/SonicStream-YouTube-Downloader
+#4–#13). Fixed and verified this session:
+
+- **#4 restore hang (the "stuck 3 hours" report):** not a hang — a retry
+  storm. Every auto-resume re-queued permanently dead YouTube videos
+  (unavailable/private/terminated), each burning 3 retry attempts, serialized
+  before other playlists' jobs. Now: `is_permanent_download_error()` detects
+  those, they get terminal status **`unavailable`** (new), retries are
+  skipped, and resume excludes them (Force All still retries). A one-time
+  migration in `get_history` converted existing permanent errors — live
+  result: 120 tracks became `unavailable`, All Songs resume queue dropped
+  from 184 to ~74 real candidates. `unavailable` counts as failure in job
+  counts; new option in the grid status filter.
+- **#5 import delta-only:** playlist matching by id → URL → title (URL-less
+  manual playlists); verified double re-import = 0 imported / 0 tracks added.
+- **#6 playlist ordering:** display order == list position in history.json.
+  `POST /api/history/{id}/move` {direction: up|down} swaps with the
+  neighboring visible playlist; up/down arrows on sidebar rows; new/imported
+  playlists now **append at the end** (was insert-at-top); export/import
+  preserve order.
+- **#7 smooth seek ball:** range input had default step=1 (1% jumps) →
+  `step="any"` + requestAnimationFrame loop while playing.
+- **#8 checkbox alignment:** grid `td` had no padding rule (browser default)
+  vs `th` 0.5rem → uniform cell padding + normalized checkbox boxes.
+- **#9 pager buttons:** `.pager-btn` class — neon blue enabled, literal grey
+  `#64748b` when disabled (note: `--text-muted` is now blue, so disabled
+  states need the literal grey).
+- **#10 Active Job HUD:** cyan → purple theme (bg/border/pulse-ring/accents).
+- **#11 sortable grid columns:** #, Title, Channel, Duration, Status, Error
+  Details; click cycles asc ▲ / desc ▼ / reset-to-playlist-order.
+- **#12 Analyze bar moved into the header** (logo | analyze | Settings);
+  hero is now player (left) + reserved `#utilityPanel` placeholder (right).
+- **#13 (OPEN, awaiting owner):** what goes into the reserved panel —
+  weather via Open-Meteo vs Up-Next/stats/visualizer alternatives.
+
+**Notes for next session:**
+- "Sync Test" playlist is in Trash (`deleted: true`) — the user trashed it
+  during their overnight session; restore from Trash tab if needed for sync
+  testing.
+- The user's stale duplicate report of the HUD-count / skipped-status /
+  pause-counter items was re-confirmed as already fixed (previous session).
+- Verified live on a real All Songs resume: HUD shows job-wide 621/833
+  matching the sidebar.
