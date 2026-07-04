@@ -237,7 +237,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="sidebar-row-title" title="${job.title}">${job.title}</div>
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.25rem;">
-                        <span style="font-size: 0.65rem; color: var(--text-muted);">${totalTracks} tracks</span>
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">${totalTracks} tracks</span>
                         <div class="sidebar-row-controls" style="display: flex; gap: 0.5rem; align-items: center;">
                             ${job.id !== "deleted_tracks" ? `
                             <button class="sidebar-row-btn restore-sidebar-btn" title="Restore Playlist">
@@ -288,7 +288,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 playlistItems = [];
                                 playlistTitle.textContent = "No Playlist Selected";
                                 playlistMetaInfo.textContent = "Select a playlist from the left explorer.";
-                                playlistTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">No items active.</td></tr>`;
+                                playlistTableBody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">No items active.</td></tr>`;
                             }
                             await loadSidebar();
                         }
@@ -302,10 +302,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 row.innerHTML = `
                     <div class="sidebar-row-header">
                         <div class="sidebar-row-title" title="${job.title}">${job.title}</div>
-                        ${!isVirtual ? `<span style="font-size: 0.65rem; color: var(--text-muted); font-weight: bold; flex-shrink: 0;">${percent}%</span>` : ''}
+                        ${!isVirtual ? `<span style="font-size: 0.8rem; color: var(--text-muted); font-weight: bold; flex-shrink: 0;">${percent}%</span>` : ''}
                     </div>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.25rem;">
-                        <span style="font-size: 0.65rem; color: var(--text-muted);">${completed}/${totalTracks} tracks</span>
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">${completed}/${totalTracks} tracks</span>
                         <div class="sidebar-row-controls" style="display: flex; gap: 0.5rem; align-items: center;">
                             <button class="sidebar-row-btn play-sidebar-btn" title="Play Playlist">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -438,7 +438,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                     playlistItems = [];
                                     playlistTitle.textContent = "No Playlist Selected";
                                     playlistMetaInfo.textContent = "Select a playlist from the left explorer.";
-                                    playlistTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">No items active.</td></tr>`;
+                                    playlistTableBody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">No items active.</td></tr>`;
                                 }
                                 await loadSidebar();
                             }
@@ -463,14 +463,14 @@ document.addEventListener("DOMContentLoaded", () => {
         
         if ((!job.items || job.items.length === 0) && job.url && !job.is_virtual) {
             playlistMetaInfo.textContent = "Loading items from YouTube...";
-            playlistTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">Fetching track list...</td></tr>`;
+            playlistTableBody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">Fetching track list...</td></tr>`;
             
             const fetched = await fetchPlaylistTracksFallback(job);
             if (fetched && fetched.length > 0) {
                 playlistItems = fetched;
             } else {
                 playlistItems = [];
-                playlistTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--error); padding: 2rem;">Failed to fetch tracks.</td></tr>`;
+                playlistTableBody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--error); padding: 2rem;">Failed to fetch tracks.</td></tr>`;
                 playlistMetaInfo.textContent = "Fetch failed.";
                 return;
             }
@@ -700,7 +700,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const pageItems = filteredItems.slice(startIdx, endIdx);
 
         if (totalFiltered === 0) {
-            playlistTableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">No items active.</td></tr>`;
+            playlistTableBody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">No items active.</td></tr>`;
             pageIndicator.textContent = "Page 1 of 1";
             btnPrevPage.disabled = true;
             btnNextPage.disabled = true;
@@ -793,6 +793,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         </div>
                     </div>
                 </td>
+                <td class="error-detail-cell" id="error-detail-${item.id}" title="${state.error_detail || ''}" style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--error); font-size: 0.7rem;">${state.error_detail || ""}</td>
             `;
             
             // Checkbox event binding
@@ -1203,7 +1204,8 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const resData = await res.json();
-            hudJobTitle.textContent = `Active Job: #${resData.job_num} - ${playlistTitleVal}`;
+            hudJobTitle.textContent = playlistTitleVal;
+            if (hudCurrentFile) hudCurrentFile.textContent = "";
             
             await loadSidebar();
             startProgressStream();
@@ -1266,6 +1268,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     const displayStatusStr = itemState.status === "skipped" ? "Downloaded" : itemState.status;
                     if (statusText) statusText.textContent = `${displayStatusStr} (${itemState.percentage}%)`;
                     if (fill) fill.style.width = `${itemState.percentage}%`;
+
+                    const errCell = document.getElementById(`error-detail-${id}`);
+                    if (errCell) {
+                        errCell.textContent = itemState.error_detail || "";
+                        errCell.title = itemState.error_detail || "";
+                    }
                 });
 
                 hudProgressCount.textContent = `${completedCount} / ${totalCount}`;

@@ -7,7 +7,8 @@
     --border-active: rgba(0, 168, 255, 0.4);
     --text-primary: #f1f5f9;
     --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+    /* Muted text: low-contrast gray replaced with the app's accent blue */
+    --text-muted: var(--neon-blue);
     --neon-blue: #00a8ff;
     --neon-purple: #9c27b0;
     --neon-pink: #e91e63;

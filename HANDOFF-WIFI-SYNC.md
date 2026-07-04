@@ -93,5 +93,52 @@ remove existing ones without bumping `version`.
 ## Suggested follow-ups for you (not done, by design)
 
 - Settings UI section: Wi-Fi Sync toggle, show IP/port/token, QR code for pairing
+  *(done — see 05013a4 and the Settings modal)*
 - Call `POST /api/sync/export-manifest` automatically after each completed download job
 - Optional: mDNS/Bonjour advertisement so the phone can discover the PC without typing an IP
+
+## Session 2026-07-03 (later): Antigravity WIP completed + UI requirements
+
+Antigravity ran out of quota mid-task; its uncommitted work was preserved as
+snapshot commit `bc140cf`. That WIP plus this session together implement the
+user's requirements list. Status:
+
+**Already in Antigravity's WIP (`bc140cf`), verified working:**
+- Active Job HUD moved above the playlist grid, outside the playlist card,
+  with a distinct cyan-tinted background (`.active-job-hud` in `style.css`)
+- HUD shows playlist title first, then `↳ <current file>` (new
+  `playlist_title` field in `download_state` and the SSE payload)
+- Persistent **Individual Downloads** playlist (`id: individual_downloads`):
+  single-link downloads route into it in `/api/download`; legacy single-track
+  jobs are migrated into it on first `/api/history` call
+- Pause counter / player status font doubled (0.65rem → 1.3rem)
+- Playlist sidebar stretches to match the grid panel height
+  (removed min/max-height constraints; verified bottoms align)
+
+**Added this session (uncommitted on `feature/wifi-sync`):**
+- `--text-muted` redefined from gray `#64748b` to `var(--neon-blue)` in
+  `style.css` — fixes low-contrast text app-wide via the one variable
+- Sidebar track-count line (and % badge) 0.65rem → 0.8rem (`app.js`)
+- **Error Details** column after Status in the items grid, populated from
+  `error_detail` and updated live from the SSE stream (colspans bumped 8 → 9,
+  table min-width 900 → 1080px)
+- **All Downloads** virtual playlist now aggregates **audio jobs only**
+  (`get_history` skips `format == "video"`); it remains computed-on-request,
+  hence permanent and non-deletable by construction
+- Individual Downloads records `download_dir` on each queue so the sync
+  manifest can resolve its files (same class of bug as the folder-import fix)
+- Removed the dead History modal from `index.html` (its open button was
+  already gone in the WIP; it held the obsolete Playlists/Single-Files split)
+- `.claude/launch.json` added for browser preview via
+  `uvicorn main:app --port 8971`
+
+**Note for next session:** the requirement "remove the playlist and individual
+download tabs" had no literal match in the UI (sidebar tabs are
+Pinned/All/Trash and were left alone); the History modal removal was the
+closest fit. Re-check with the user if they meant something else.
+
+**MusicApp direction (documented in memory, not implemented here):** docs will
+position the phone app as paired-with-server but standalone-capable — point it
+at a folder and import `playlists_manifest.json` (schema v1, same contract as
+Wi-Fi Sync). Pipeline: direct YouTube sync with ~2-track lookahead (no full
+pre-download), then OneDrive/Google Drive via their APIs.

@@ -238,7 +238,7 @@
                     
                     <!-- Grid Table -->
                     <div class="playlist-table-wrapper" style="flex-grow: 1; overflow-x: auto; max-height: 280px; border: 1px solid var(--border-color); border-radius: 8px;">
-                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.75rem; min-width: 900px;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.75rem; min-width: 1080px;">
                             <thead style="background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10;">
                                 <tr>
                                     <th style="padding: 0.5rem; width: 30px;"><input type="checkbox" id="headerCheckbox"></th>
@@ -249,6 +249,7 @@
                                     <th style="padding: 0.5rem; width: 160px;">Channel</th>
                                     <th style="padding: 0.5rem; width: 80px;">Duration</th>
                                     <th style="padding: 0.5rem; width: 150px;">Status</th>
+                                    <th style="padding: 0.5rem; width: 180px;">Error Details</th>
                                 </tr>
                             </thead>
                             <tbody id="playlistTableBody">
@@ -279,75 +280,6 @@
                 
             </div>
         </main>
-    </div>
-
-    <!-- History Overlay Modal -->
-    <div class="modal-overlay hidden" id="historyModal">
-        <div class="modal" style="max-width: 1250px; width: 95%;">
-            <div class="modal-header">
-                <h3>Download Jobs History</h3>
-                <button class="btn btn-secondary btn-sm" id="clearHistoryBtn">Clear History</button>
-            </div>
-            
-            <div class="modal-body" style="max-height: 450px; overflow-y: auto; padding: 1rem;">
-                <div class="history-filters" style="display: flex; gap: 0.75rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
-                    <input type="text" id="historySearch" placeholder="Search past jobs by title..." style="flex-grow: 1; background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); padding: 0.55rem 0.85rem; border-radius: 8px; color: var(--text-primary); font-size: 0.85rem;">
-                    <select id="historyTypeFilter" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 0.55rem 1rem; border-radius: 8px; outline: none; font-weight: 600; cursor: pointer; font-size: 0.85rem;">
-                        <option value="all">All Types</option>
-                        <option value="playlist">Playlists</option>
-                        <option value="single">Single Files</option>
-                    </select>
-                    <select id="historyFormatFilter" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 0.55rem 1rem; border-radius: 8px; outline: none; font-weight: 600; cursor: pointer; font-size: 0.85rem;">
-                        <option value="all">All Formats</option>
-                        <option value="audio">Audio</option>
-                        <option value="video">Video</option>
-                    </select>
-                    <select id="historyStatusFilter" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 0.55rem 1rem; border-radius: 8px; outline: none; font-weight: 600; cursor: pointer; font-size: 0.85rem;">
-                        <option value="all">All Results</option>
-                        <option value="completed">Completed</option>
-                        <option value="partial">Partial</option>
-                        <option value="failed">Failed</option>
-                        <option value="pending">Pending</option>
-                    </select>
-                </div>
-                <div style="width: 100%; max-width: 100%; overflow-x: auto;">
-                    <table class="playlist-table" id="historyTable" style="width: 100%; min-width: 800px;">
-                        <thead>
-                            <tr>
-                                <th width="200">Job #</th>
-                                <th width="110">Type</th>
-                                <th>Name</th>
-                                <th width="80" style="text-align: center;">Tracks</th>
-                                <th width="90" style="text-align: center;">Times Run</th>
-                                <th width="150">First Run</th>
-                                <th width="150">Last Run</th>
-                                <th width="90" style="color: #27c93f; text-align: center;">Success</th>
-                                <th width="90" style="color: var(--error); text-align: center;">Failures</th>
-                                <th width="200">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="historyTableBody">
-                            <!-- Dynamic logs rows -->
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- History Pagination Controls -->
-                <div class="pagination-controls" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem; flex-wrap: wrap; gap: 0.75rem; background: rgba(0,0,0,0.15); padding: 0.75rem 1.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
-                    <div style="font-size: 0.85rem; color: var(--text-secondary);">
-                        Showing <span id="historyPaginationRange" style="font-weight: 700; color: var(--text-primary);">0 - 0</span> of <span id="historyPaginationTotal" style="font-weight: 700; color: var(--neon-blue);">0</span> jobs
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <button class="btn btn-secondary btn-sm" id="btnHistoryFirstPage" style="padding: 0.35rem 0.65rem;">First</button>
-                        <button class="btn btn-secondary btn-sm" id="btnHistoryPrevPage" style="padding: 0.35rem 0.65rem;">Prev</button>
-                        <span id="historyPageIndicator" style="font-size: 0.85rem; color: var(--text-secondary); margin: 0 0.5rem; font-weight: 600;">Page 1 of 1</span>
-                        <button class="btn btn-secondary btn-sm" id="btnHistoryNextPage" style="padding: 0.35rem 0.65rem;">Next</button>
-                        <button class="btn btn-secondary btn-sm" id="btnHistoryLastPage" style="padding: 0.35rem 0.65rem;">Last</button>
-                    </div>
-                </div>
-            </div>
-
-        </div>
     </div>
 
     <!-- Settings Modal -->

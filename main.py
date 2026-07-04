@@ -816,6 +816,7 @@ async def start_download(req: DownloadRequest):
                 individual_job["total_tracks"] = len(individual_job.get("items", []))
                 individual_job["format"] = req.format
                 individual_job["quality"] = req.quality
+                individual_job["download_dir"] = target_dir
                 save_history(history)
                 req_queued = req
             else:
@@ -947,10 +948,13 @@ async def get_history():
     with history_lock:
         history = load_history()
         
-        # 1. Compute union of all completed/skipped tracks for "All Downloads"
+        # 1. Compute union of all completed/skipped audio tracks for "All Downloads"
+        # (system-maintained, permanent: video jobs are excluded)
         unique_tracks = {}
         for job in history:
             if job.get("deleted") or job.get("id") == "deleted_tracks":
+                continue
+            if job.get("format", "audio") != "audio":
                 continue
             for item in job.get("items", []):
                 if item.get("status") in ["completed", "skipped"]:
