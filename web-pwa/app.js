@@ -1381,17 +1381,8 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
-        // Sort Pinned Playlists to top, Normal in middle, Deleted Tracks LAST
-        filtered.sort((a, b) => {
-            const isADeleted = a.id === "deleted_tracks" || a.id === "trash" || (a.title && a.title.toLowerCase().includes("deleted"));
-            const isBDeleted = b.id === "deleted_tracks" || b.id === "trash" || (b.title && b.title.toLowerCase().includes("deleted"));
-            if (isADeleted && !isBDeleted) return 1;
-            if (!isADeleted && isBDeleted) return -1;
-
-            if (a.isPinned && !b.isPinned) return -1;
-            if (!a.isPinned && b.isPinned) return 1;
-            return 0;
-        });
+        // Pinned first, "Deleted tracks" playlist always last (shared rule).
+        filtered = sortPlaylistsForDisplay(filtered);
 
         if (filtered.length === 0) {
             playlistListContainer.innerHTML = `<div style="font-size:0.75rem; color: var(--text-muted); text-align:center; padding: 1.5rem 0;">No offline playlists found.</div>`;
@@ -1496,6 +1487,55 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // --- Dedicated Mobile UX Handlers ---
+    // Shared ordering: pinned first, "Deleted tracks" playlist always last.
+    function sortPlaylistsForDisplay(arr) {
+        const isDeleted = p => p.id === "deleted_tracks" || p.id === "trash" || (p.title && p.title.toLowerCase().includes("deleted"));
+        return [...arr].sort((a, b) => {
+            const ad = isDeleted(a), bd = isDeleted(b);
+            if (ad && !bd) return 1;
+            if (!ad && bd) return -1;
+            if (a.isPinned && !b.isPinned) return -1;
+            if (!a.isPinned && b.isPinned) return 1;
+            return 0;
+        });
+    }
+
+    // Shared playlist action markup + wiring (used by desktop rows had their own;
+    // this drives the mobile cards and the mobile tracks-view toolbar).
+    const PA_BTN_STYLE = "background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); cursor: pointer; padding: 8px 0; font-size: 1.2rem; border-radius: 8px; flex: 1; display: inline-flex; align-items: center; justify-content: center;";
+    function playlistActionsHtml() {
+        return `
+            <button class="pa-download" title="Download all to offline cache" style="${PA_BTN_STYLE} color: var(--neon-blue);">⬇️</button>
+            <button class="pa-play" title="Play" style="${PA_BTN_STYLE} color: var(--neon-blue);">▶️</button>
+            <button class="pa-resume" title="Resume from last position" style="${PA_BTN_STYLE} color: var(--neon-purple);">⏯️</button>
+            <button class="pa-shuffle" title="Shuffle play" style="${PA_BTN_STYLE} color: var(--text-secondary);">🔀</button>
+            <button class="pa-pin" title="Pin / unpin" style="${PA_BTN_STYLE} color: var(--text-muted);">📌</button>
+            <button class="pa-delete" title="Delete playlist" style="${PA_BTN_STYLE} color: #ff5f56;">🗑️</button>`;
+    }
+    function wirePlaylistActions(scope, pl) {
+        const stop = fn => (e) => { e.stopPropagation(); fn(e); };
+        const on = (sel, fn) => { const el = scope.querySelector(sel); if (el) el.addEventListener("click", stop(fn)); };
+        on(".pa-download", async (e) => {
+            const b = e.currentTarget; b.textContent = "⏳";
+            try {
+                if (pl.tracks) for (let i = 0; i < pl.tracks.length; i++) await prefetchUpcomingTracks([pl.tracks[i]], -1, 1);
+                b.textContent = "✅";
+            } catch (_) { b.textContent = "⚠️"; }
+            setTimeout(() => { b.textContent = "⬇️"; }, 3000);
+        });
+        on(".pa-play", () => { selectPlaylist(pl); if (pl.tracks && pl.tracks.length) playTrack(pl.tracks[0], pl.tracks, 0); });
+        on(".pa-resume", () => { selectPlaylist(pl); resumePlaylist(pl); });
+        on(".pa-shuffle", () => { selectPlaylist(pl); if (pl.tracks && pl.tracks.length) { const s = [...pl.tracks].sort(() => Math.random() - 0.5); playTrack(s[0], s, 0); } });
+        on(".pa-pin", () => { pl.isPinned = !pl.isPinned; savePlaylistToDB(pl); renderSidebarList(); renderMobilePlaylists(); });
+        on(".pa-delete", () => {
+            if (confirm(`Delete playlist "${pl.title}"?`)) {
+                if (db) { const tx = db.transaction("playlists", "readwrite"); tx.objectStore("playlists").delete(pl.id); }
+                playlists = playlists.filter(p => p.id !== pl.id);
+                renderSidebarList(); renderMobilePlaylists();
+            }
+        });
+    }
+
     function renderMobilePlaylists() {
         if (!mobilePlaylistsList) return;
         mobilePlaylistsList.innerHTML = "";
@@ -1505,25 +1545,29 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        playlists.forEach(pl => {
+        sortPlaylistsForDisplay(playlists).forEach(pl => {
             const trackCount = (pl.tracks || []).length;
             const thumb = getPlaylistThumbnail(pl);
 
             const card = document.createElement("div");
             card.className = "mobile-playlist-card";
+            card.style.flexDirection = "column";
+            card.style.alignItems = "stretch";
             card.innerHTML = `
-                <img src="${thumb}" class="mobile-card-thumb" onerror="this.src='icon.svg'">
-                <div class="mobile-card-info">
-                    <div class="mobile-card-title">${pl.title || 'Untitled Playlist'}</div>
-                    <div class="mobile-card-subtitle">${trackCount} tracks ${pl.isPinned ? '• 📌 Pinned' : ''}</div>
+                <div class="mpc-main" style="display: flex; align-items: center; gap: 0.85rem;">
+                    <img src="${thumb}" class="mobile-card-thumb" onerror="this.onerror=null; this.src='gita_cover_logo.png'">
+                    <div class="mobile-card-info">
+                        <div class="mobile-card-title">${pl.isPinned ? '📌 ' : ''}${pl.title || 'Untitled Playlist'}</div>
+                        <div class="mobile-card-subtitle">${trackCount} tracks</div>
+                    </div>
+                    <div style="font-size: 1.4rem; color: var(--neon-blue);">›</div>
                 </div>
-                <div style="font-size: 1.2rem; color: var(--neon-blue);">›</div>
+                <div class="mpc-actions" style="display: flex; gap: 0.35rem; margin-top: 0.65rem;">
+                    ${playlistActionsHtml()}
+                </div>
             `;
-
-            card.addEventListener("click", () => {
-                showMobilePlaylistTracks(pl);
-            });
-
+            card.querySelector(".mpc-main").addEventListener("click", () => showMobilePlaylistTracks(pl));
+            wirePlaylistActions(card, pl);
             mobilePlaylistsList.appendChild(card);
         });
     }
@@ -1536,6 +1580,19 @@ document.addEventListener("DOMContentLoaded", () => {
         mobilePlaylistsView.style.display = "none";
         mobileTracksView.style.display = "block";
 
+        // Action toolbar at the top of the tracks view (parity with desktop).
+        let toolbar = document.getElementById("mobileTracksToolbar");
+        if (!toolbar) {
+            toolbar = document.createElement("div");
+            toolbar.id = "mobileTracksToolbar";
+            toolbar.style.cssText = "display: flex; gap: 0.35rem; padding: 0 0.25rem 0.75rem; flex-wrap: wrap;";
+            if (mobileTrackList && mobileTrackList.parentNode) {
+                mobileTrackList.parentNode.insertBefore(toolbar, mobileTrackList);
+            }
+        }
+        toolbar.innerHTML = playlistActionsHtml();
+        wirePlaylistActions(toolbar, pl);
+
         if (mobileTrackList) {
             mobileTrackList.innerHTML = "";
             const tracks = pl.tracks || [];
@@ -1547,14 +1604,14 @@ document.addEventListener("DOMContentLoaded", () => {
             tracks.forEach((track, idx) => {
                 const item = document.createElement("div");
                 item.className = "mobile-track-item";
-                const thumb = track.thumbnail || "icon.svg";
+                const thumb = getTrackThumbnailUrl(track);
                 item.innerHTML = `
-                    <img src="${thumb}" class="mobile-track-thumb" onerror="this.src='icon.svg'">
+                    <img src="${thumb}" class="mobile-track-thumb" onerror="this.onerror=null; this.src='gita_cover_logo.png'">
                     <div class="mobile-track-details">
                         <div class="mobile-track-title">${track.title || 'Untitled Track'}</div>
                         <div class="mobile-track-artist">${track.artist || track.uploader || 'SonicStream'} • ${formatDuration(track.duration || 0)}</div>
                     </div>
-                    <button class="btn btn-secondary btn-sm" style="padding: 0.3rem 0.5rem; font-size: 0.75rem; border-radius: 6px;">▶ Play</button>
+                    <button class="btn btn-secondary btn-sm" style="padding: 0.3rem 0.5rem; font-size: 0.75rem; border-radius: 6px;">▶</button>
                 `;
 
                 item.addEventListener("click", () => {
@@ -2033,6 +2090,12 @@ document.addEventListener("DOMContentLoaded", () => {
     let compressorNode = null;
 
     function initWebAudioEngine() {
+        // On phones, do NOT route audio through the Web Audio graph. iOS suspends
+        // the AudioContext when the screen locks / the app backgrounds, which stops
+        // playback and leaves the lock-screen Play button doing nothing; the
+        // compressor also causes a stutter/echo on pause. Plain <audio> keeps
+        // playing in the background and obeys lock-screen / car Bluetooth controls.
+        if (isPhoneDevice()) return;
         if (audioCtx) {
             if (audioCtx.state === "suspended") {
                 audioCtx.resume();
@@ -2087,7 +2150,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!("mediaSession" in navigator)) return;
         try {
             navigator.mediaSession.setActionHandler("play", () => {
-                if (audioElement.src) { audioElement.play(); isPlaying = true; updatePlayBtnUI(); }
+                if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+                if (audioElement.src) { audioElement.play().catch(()=>{}); isPlaying = true; updatePlayBtnUI(); }
             });
             navigator.mediaSession.setActionHandler("pause", () => {
                 if (audioElement.src) { audioElement.pause(); isPlaying = false; updatePlayBtnUI(); }
@@ -2105,14 +2169,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     audioElement.currentTime = details.seekTime;
                 }
             });
-            navigator.mediaSession.setActionHandler("seekbackward", (details) => {
-                audioElement.currentTime = Math.max(0, audioElement.currentTime - (details.seekOffset || 10));
-            });
-            navigator.mediaSession.setActionHandler("seekforward", (details) => {
-                if (audioElement.duration) {
-                    audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + (details.seekOffset || 10));
-                }
-            });
+            // Do NOT register seekbackward/seekforward: iOS shows 15s skip buttons
+            // in their place and hides Next/Previous on the lock screen and in the
+            // car. We want Next/Previous, so leave these explicitly unset.
+            navigator.mediaSession.setActionHandler("seekbackward", null);
+            navigator.mediaSession.setActionHandler("seekforward", null);
         } catch (e) {
             console.warn("[MediaSession] AVRCP registration note:", e);
         }
@@ -2166,6 +2227,36 @@ document.addEventListener("DOMContentLoaded", () => {
             const base = location.href.split("?")[0].split("#")[0];
             location.replace(base + "?v=" + Date.now());
         });
+    }
+
+    // --- Logo -> Home (never interrupts playback) ---
+    const appHomeLogo = document.getElementById("appHomeLogo");
+    if (appHomeLogo) {
+        appHomeLogo.addEventListener("click", () => {
+            // Mobile: return to the playlists overview
+            if (mobileTracksView && mobilePlaylistsView) {
+                mobileTracksView.style.display = "none";
+                mobilePlaylistsView.style.display = "block";
+            }
+            // Desktop: make sure the playlist sidebar is showing
+            const sb = document.querySelector(".playlist-sidebar");
+            if (sb) sb.style.display = "flex";
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+    }
+
+    // Persist the effective settings into IndexedDB so the DB browser shows them.
+    async function persistEffectiveSettings() {
+        const eff = {
+            azure_storage_account: getAzureStorageAccount(),
+            azure_container: getAzureContainer(),
+            azure_client_id: getAzureClientId(),
+            azure_sas_token: getAzureSASToken(),
+            onedrive_share_link: getOneDriveShareLink()
+        };
+        for (const [k, v] of Object.entries(eff)) {
+            if (v) await saveSettingToDB(k, v);
+        }
     }
 
     // --- Settings Modal ---
@@ -2337,6 +2428,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- Startup Initialization ---
     initDB().then(async () => {
         await purgeLargeFilesFromDB();
+        await persistEffectiveSettings();
         await loadPlaylistsFromDB();
     });
     initMSAL();

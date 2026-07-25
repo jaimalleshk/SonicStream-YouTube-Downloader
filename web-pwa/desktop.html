@@ -10,6 +10,7 @@
     
     <!-- PWA Manifest & Icons -->
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="favicon-desktop.svg">
     <link rel="apple-touch-icon" href="icon.svg">
     
     <!-- Google Fonts -->
@@ -36,7 +37,7 @@
         <!-- Header -->
         <header style="margin-bottom: 0.65rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: nowrap;">
             <div class="logo-group" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: nowrap; flex-shrink: 0;">
-                <div class="logo" style="display: flex; align-items: center; gap: 0.4rem;">
+                <div class="logo" id="appHomeLogo" title="Home" style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="url(#logoGrad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="logo-icon">
                         <defs>
                             <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -225,56 +226,34 @@
                             </div>
                         </div>
                         
-                        <!-- Grid Header Controls -->
-                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                            <!-- Play Playlist Button -->
-                            <button id="playPlaylistBtn" class="btn btn-primary" style="padding: 0.45rem 0.8rem; font-size: 0.85rem; border-radius: 6px; display: flex; align-items: center; gap: 0.35rem;" title="Start playing active playlist from beginning">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                                <span>Play</span>
+                        <!-- Grid Header Controls (icon-only; hover tooltip shows the label) -->
+                        <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                            <button id="playPlaylistBtn" class="btn btn-primary" style="padding: 0.45rem 0.6rem; border-radius: 6px; display: flex; align-items: center;" title="Play playlist">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                             </button>
-
-                            <!-- Shuffle Play Button -->
-                            <button id="shufflePlaylistBtn" class="btn btn-secondary" style="padding: 0.45rem 0.8rem; font-size: 0.85rem; border-radius: 6px; display: flex; align-items: center; gap: 0.35rem;" title="Shuffle track order and start playing">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
-                                <span>Shuffle Play</span>
+                            <button id="shufflePlaylistBtn" class="btn btn-secondary" style="padding: 0.45rem 0.6rem; border-radius: 6px; display: flex; align-items: center;" title="Shuffle play">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
                             </button>
-
-                            <!-- Resume Playlist Button -->
-                            <button id="resumePlaylistBtn" class="btn btn-secondary" style="padding: 0.45rem 0.8rem; font-size: 0.85rem; border-radius: 6px; display: flex; align-items: center; gap: 0.35rem;" title="Resume playlist from last stopped track and time position">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
-                                <span>Resume</span>
+                            <button id="resumePlaylistBtn" class="btn btn-secondary" style="padding: 0.45rem 0.6rem; border-radius: 6px; display: flex; align-items: center;" title="Resume from last position">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
                             </button>
-
-                            <!-- Pre-download 3 Songs Buffer button -->
-                            <button id="btnPrefetch3" class="btn btn-secondary" style="padding: 0.45rem 0.8rem; font-size: 0.85rem; border-radius: 6px; display: flex; align-items: center; gap: 0.35rem; border-color: var(--neon-blue);" title="Pre-download 3 upcoming error-free songs into IndexedDB ahead of playback">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--neon-blue)" stroke-width="2">
-                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                                </svg>
-                                <span>Pre-download 3 Songs</span>
+                            <button id="btnPrefetch3" class="btn btn-secondary" style="padding: 0.45rem 0.6rem; border-radius: 6px; display: flex; align-items: center; border-color: var(--neon-blue);" title="Pre-download next 3 songs to offline cache">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--neon-blue)" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                             </button>
-
-                            <!-- Sync/Refresh Playlist button -->
-                            <button id="refreshPlaylistBtn" class="btn btn-secondary" style="padding: 0.45rem 0.8rem; font-size: 0.85rem; border-radius: 6px; display: flex; align-items: center; gap: 0.35rem;" title="Sync playlist content">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
-                                </svg>
-                                <span>Sync Playlist</span>
+                            <button id="refreshPlaylistBtn" class="btn btn-secondary" style="padding: 0.45rem 0.6rem; border-radius: 6px; display: flex; align-items: center;" title="Sync playlist">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                             </button>
-                            
-                            <button id="selectAllBtn" class="btn btn-secondary btn-sm" style="padding: 0.45rem 0.8rem; font-size: 0.85rem; border-radius: 6px;">Select All</button>
-                            <button id="deselectAllBtn" class="btn btn-secondary btn-sm" style="padding: 0.45rem 0.8rem; font-size: 0.85rem; border-radius: 6px;">Deselect All</button>
-                            
-                            <button id="downloadBtn" class="btn btn-primary" style="padding: 0.45rem 0.8rem; font-size: 0.85rem; border-radius: 6px; display: flex; align-items: center; gap: 0.35rem;">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                                </svg>
-                                <span>Download Selected</span>
+                            <button id="selectAllBtn" class="btn btn-secondary btn-sm" style="padding: 0.45rem 0.6rem; border-radius: 6px; display: flex; align-items: center;" title="Select all">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
                             </button>
-
-                            <!-- Download All Button (OneDrive & YouTube) -->
-                            <button id="downloadAllBtn" class="btn btn-primary" style="padding: 0.45rem 0.8rem; font-size: 0.85rem; border-radius: 6px; display: flex; align-items: center; gap: 0.35rem; background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%); border: none;" title="Download all tracks in active playlist into IndexedDB for 100% offline playback">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                                <span style="color: #000; font-weight: 700;">Download All</span>
+                            <button id="deselectAllBtn" class="btn btn-secondary btn-sm" style="padding: 0.45rem 0.6rem; border-radius: 6px; display: flex; align-items: center;" title="Deselect all">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                            </button>
+                            <button id="downloadBtn" class="btn btn-primary" style="padding: 0.45rem 0.6rem; border-radius: 6px; display: flex; align-items: center;" title="Download selected to offline cache">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                            </button>
+                            <button id="downloadAllBtn" class="btn btn-primary" style="padding: 0.45rem 0.6rem; border-radius: 6px; display: flex; align-items: center; background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%); border: none;" title="Download ALL tracks to offline cache">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                             </button>
                         </div>
                     </div>
@@ -442,6 +421,8 @@
                     <p class="help-text">SonicStream handles YouTube protocol updates and cookie extraction automatically to prevent HTTP 403 errors during download.</p>
                 </div>
             </div>
+        </div>
+    </div>
 
     <!-- Live Console & Trace Log Modal -->
     <div id="liveConsoleModal" class="modal-overlay hidden" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 99999; backdrop-filter: blur(10px); align-items: center; justify-content: center; padding: 1rem;">

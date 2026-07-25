@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SonicStream - IndexedDB Browser & Troubleshooting Tool</title>
+    <link rel="icon" type="image/svg+xml" href="favicon-db.svg">
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -583,14 +584,22 @@
                     preview = String(rec.value);
                 }
 
-                // Check referencing playlists
-                const recKey = String(rec.key);
-                const mappedSet = playlistRefMap[recKey] || playlistRefMap[valObj.file] || playlistRefMap[valObj.file_id] || playlistRefMap[valObj.id] || playlistRefMap[valObj.normKey];
-                const mappedArray = mappedSet ? Array.from(mappedSet) : [];
-
-                const mappedBadge = mappedArray.length > 0
-                    ? mappedArray.map(p => `<span style="background: rgba(0, 242, 254, 0.15); color: var(--neon-blue); padding: 0.15rem 0.4rem; border-radius: 6px; font-size: 0.72rem; display: inline-block; margin: 1px;">${p}</span>`).join(" ")
-                    : `<span style="color: var(--text-muted); font-size: 0.75rem;">--</span>`;
+                // "Mapped Playlists" column is contextual:
+                //  - files store: which playlists reference this cached file
+                //  - playlists store: the playlist's own title + track count
+                //  - settings store: n/a
+                const badge = (txt) => `<span style="background: rgba(0, 242, 254, 0.15); color: var(--neon-blue); padding: 0.15rem 0.4rem; border-radius: 6px; font-size: 0.72rem; display: inline-block; margin: 1px;">${String(txt).replace(/</g,'&lt;')}</span>`;
+                const dash = `<span style="color: var(--text-muted); font-size: 0.75rem;">--</span>`;
+                let mappedBadge;
+                if (activeStoreName === "playlists") {
+                    const tc = (valObj.tracks || valObj.items || []).length;
+                    mappedBadge = badge((valObj.title || valObj.id || "Playlist") + " · " + tc + " tracks");
+                } else {
+                    const recKey = String(rec.key);
+                    const mappedSet = playlistRefMap[recKey] || playlistRefMap[valObj.file] || playlistRefMap[valObj.file_id] || playlistRefMap[valObj.id] || playlistRefMap[valObj.normKey];
+                    const mappedArray = mappedSet ? Array.from(mappedSet) : [];
+                    mappedBadge = mappedArray.length > 0 ? mappedArray.map(p => badge(p)).join(" ") : dash;
+                }
 
                 tr.innerHTML = `
                     <td style="color: var(--text-muted);">${start + idx + 1}</td>
