@@ -1404,19 +1404,18 @@ document.addEventListener("DOMContentLoaded", () => {
             const trackCount = (pl.tracks || []).length;
             row.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 0.6rem; width: 100%; min-width: 0;">
-                    <img src="${firstThumb}" style="width: 38px; height: 38px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border-color); flex-shrink: 0;" onerror="this.onerror=null; this.src='gita_cover_logo.png';">
+                    <img src="${firstThumb}" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border-color); flex-shrink: 0;" onerror="this.onerror=null; this.src='gita_cover_logo.png';">
                     <div style="display: flex; flex-direction: column; min-width: 0; flex: 1;">
                         <div class="sidebar-row-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; font-size: 0.85rem; color: var(--text-primary);">${pl.isPinned ? '📌 ' : ''}${pl.title}</div>
                         <div class="sidebar-row-meta" style="font-size: 0.7rem; color: var(--text-secondary);">${trackCount} tracks | ${pl.source === 'desktop' ? 'Desktop Synced' : (pl.source === 'local' ? 'iPhone File' : 'OneDrive')}</div>
                     </div>
-                </div>
-                <div class="sidebar-row-actions" style="display: flex; gap: 0.25rem; align-items: center; width: 100%; justify-content: space-between; margin-top: 0.4rem;" onclick="event.stopPropagation();">
-                    <button class="download-sidebar-btn" title="Download All Tracks to IndexedDB" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); cursor: pointer; color: var(--neon-blue); padding: 6px 10px; font-size: 1.15rem; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;">⬇️</button>
-                    <button class="play-sidebar-btn" title="Play Playlist" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); cursor: pointer; color: var(--neon-blue); padding: 6px 10px; font-size: 1.15rem; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;">▶️</button>
-                    <button class="resume-sidebar-btn" title="Resume Playlist" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); cursor: pointer; color: var(--neon-purple); padding: 6px 10px; font-size: 1.15rem; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;">⏯️</button>
-                    <button class="shuffle-sidebar-btn" title="Shuffle Play" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-secondary); padding: 6px 10px; font-size: 1.15rem; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;">🔀</button>
-                    <button class="pin-sidebar-btn" title="Pin Playlist" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-muted); padding: 6px 10px; font-size: 1.15rem; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;">📌</button>
-                    <button class="delete-sidebar-btn" title="Delete Playlist" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); cursor: pointer; color: #ff5f56; padding: 6px 10px; font-size: 1.15rem; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;">🗑️</button>
+                    <div class="sidebar-row-actions" style="display: flex; gap: 0.15rem; align-items: center; flex-shrink: 0;" onclick="event.stopPropagation();">
+                        <button class="play-sidebar-btn" title="Play Playlist" style="background: transparent; border: none; cursor: pointer; color: var(--neon-blue); padding: 2px 4px; font-size: 1.05rem;">▶️</button>
+                        <button class="resume-sidebar-btn" title="Resume Playlist" style="background: transparent; border: none; cursor: pointer; color: var(--neon-purple); padding: 2px 4px; font-size: 1.05rem;">⏯️</button>
+                        <button class="download-sidebar-btn" title="Download All Tracks to IndexedDB" style="background: transparent; border: none; cursor: pointer; color: var(--neon-blue); padding: 2px 4px; font-size: 1.05rem;">⬇️</button>
+                        <button class="pin-sidebar-btn" title="Pin Playlist" style="background: transparent; border: none; cursor: pointer; color: var(--text-muted); padding: 2px 4px; font-size: 1.05rem;">📌</button>
+                        <button class="delete-sidebar-btn" title="Delete Playlist" style="background: transparent; border: none; cursor: pointer; color: #ff5f56; padding: 2px 4px; font-size: 1.05rem;">🗑️</button>
+                    </div>
                 </div>
             `;
 
@@ -1551,19 +1550,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const card = document.createElement("div");
             card.className = "mobile-playlist-card";
-            card.style.flexDirection = "column";
-            card.style.alignItems = "stretch";
+            card.style.display = "flex";
+            card.style.flexDirection = "row";
+            card.style.alignItems = "center";
+            card.style.justifyContent = "space-between";
+            card.style.padding = "0.6rem 0.85rem";
+            card.style.marginBottom = "0.5rem";
             card.innerHTML = `
-                <div class="mpc-main" style="display: flex; align-items: center; gap: 0.85rem;">
-                    <img src="${thumb}" class="mobile-card-thumb" onerror="this.onerror=null; this.src='gita_cover_logo.png'">
-                    <div class="mobile-card-info">
-                        <div class="mobile-card-title">${pl.isPinned ? '📌 ' : ''}${pl.title || 'Untitled Playlist'}</div>
-                        <div class="mobile-card-subtitle">${trackCount} tracks</div>
+                <div class="mpc-main" style="display: flex; align-items: center; gap: 0.75rem; min-width: 0; flex: 1;">
+                    <img src="${thumb}" class="mobile-card-thumb" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover; flex-shrink: 0;" onerror="this.onerror=null; this.src='gita_cover_logo.png'">
+                    <div class="mobile-card-info" style="min-width: 0; flex: 1;">
+                        <div class="mobile-card-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.9rem; font-weight: 600;">${pl.isPinned ? '📌 ' : ''}${pl.title || 'Untitled Playlist'}</div>
+                        <div class="mobile-card-subtitle" style="font-size: 0.75rem; color: var(--text-secondary);">${trackCount} tracks</div>
                     </div>
-                    <div style="font-size: 1.4rem; color: var(--neon-blue);">›</div>
                 </div>
-                <div class="mpc-actions" style="display: flex; gap: 0.35rem; margin-top: 0.65rem;">
-                    ${playlistActionsHtml()}
+                <div class="mpc-actions" style="display: flex; gap: 0.2rem; align-items: center; flex-shrink: 0;" onclick="event.stopPropagation();">
+                    <button class="pa-play" title="Play" style="background: transparent; border: none; cursor: pointer; padding: 4px; font-size: 1.1rem;">▶️</button>
+                    <button class="pa-resume" title="Resume" style="background: transparent; border: none; cursor: pointer; padding: 4px; font-size: 1.1rem;">⏯️</button>
+                    <button class="pa-download" title="Download" style="background: transparent; border: none; cursor: pointer; padding: 4px; font-size: 1.1rem;">⬇️</button>
                 </div>
             `;
             card.querySelector(".mpc-main").addEventListener("click", () => showMobilePlaylistTracks(pl));
@@ -2025,8 +2029,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const pauseInput = document.getElementById("playerPauseSeconds");
         const pauseSecs = pauseInput ? parseInt(pauseInput.value) : 5;
+        const isBackground = document.hidden || (typeof document.webkitHidden !== "undefined" && document.webkitHidden);
 
-        if (pauseSecs > 0) {
+        if (pauseSecs > 0 && !isBackground) {
             let count = pauseSecs;
             if (playerStatusEq) playerStatusEq.classList.add("hidden");
             if (playerStatusText) playerStatusText.textContent = `Pause (${count}s)...`;
@@ -2046,6 +2051,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 playNextTrack();
             }, pauseSecs * 1000);
         } else {
+            console.log("[Audio Engine] Background/screen-off state detected. Advancing next track immediately to maintain OS wake lock.");
             playNextTrack();
         }
     });
