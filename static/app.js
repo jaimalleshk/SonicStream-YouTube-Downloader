@@ -1461,6 +1461,8 @@ document.addEventListener("DOMContentLoaded", () => {
         playerTrackArtist.textContent = track.uploader || "Unknown";
         playerTrackThumb.src = track.thumbnail || `https://i.ytimg.com/vi/${track.id}/hqdefault.jpg`;
         
+        updateMediaSessionMetadata(track);
+        
         const format = document.querySelector('input[name="format"]:checked')?.value || "audio";
         const downloadDir = downloadDirInput.value.trim();
         
@@ -1560,6 +1562,9 @@ document.addEventListener("DOMContentLoaded", () => {
             svg.innerHTML = `<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>`;
         } else {
             svg.innerHTML = `<polygon points="5 3 19 12 5 21 5 3"/>`;
+        }
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
         }
     }
 
@@ -1753,6 +1758,7 @@ document.addEventListener("DOMContentLoaded", () => {
             playerProgressBar.value = (playerVideo.currentTime / playerVideo.duration) * 100;
             playerCurrentTime.textContent = formatDuration(playerVideo.currentTime);
             playerTotalTime.textContent = formatDuration(playerVideo.duration);
+            updateMediaSessionPositionState();
         }
     }
     function progressLoop() {
@@ -2431,4 +2437,124 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     shadowInputFix();
+
+    // --- MediaSession & Car Bluetooth / Hardware Media Controls ---
+    function initMediaSessionControls() {
+        if (!('mediaSession' in navigator)) return;
+
+        try {
+            navigator.mediaSession.setActionHandler('play', () => {
+                if (playerVideo.src) {
+                    playerVideo.play().catch(console.error);
+                    isPlaying = true;
+                    updatePlayBtnUI();
+                    if (playerStatusEq) {
+                        playerStatusEq.style.visibility = "visible";
+                        playerStatusEq.classList.add("playing");
+                    }
+                    if (playerStatusText) playerStatusText.textContent = "Playing";
+                }
+            });
+
+            navigator.mediaSession.setActionHandler('pause', () => {
+                if (playerVideo.src) {
+                    playerVideo.pause();
+                    isPlaying = false;
+                    updatePlayBtnUI();
+                    if (playerStatusEq) {
+                        playerStatusEq.style.visibility = "hidden";
+                        playerStatusEq.classList.remove("playing");
+                    }
+                    if (playerStatusText) playerStatusText.textContent = "Paused";
+                }
+            });
+
+            navigator.mediaSession.setActionHandler('previoustrack', () => {
+                playPrevTrack();
+            });
+
+            navigator.mediaSession.setActionHandler('nexttrack', () => {
+                playNextTrack();
+            });
+
+            navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+                const skipTime = details.seekOffset || 10;
+                if (playerVideo.duration) {
+                    playerVideo.currentTime = Math.max(playerVideo.currentTime - skipTime, 0);
+                }
+            });
+
+            navigator.mediaSession.setActionHandler('seekforward', (details) => {
+                const skipTime = details.seekOffset || 10;
+                if (playerVideo.duration) {
+                    playerVideo.currentTime = Math.min(playerVideo.currentTime + skipTime, playerVideo.duration);
+                }
+            });
+
+            navigator.mediaSession.setActionHandler('seekto', (details) => {
+                if (details.seekTime !== undefined && playerVideo.duration) {
+                    playerVideo.currentTime = details.seekTime;
+                }
+            });
+        } catch (e) {
+            console.error("MediaSession action handler setup failed:", e);
+        }
+    }
+
+    function updateMediaSessionMetadata(track) {
+        if (!('mediaSession' in navigator) || !track) return;
+
+        const currentJob = historyJobs.find(j => j.id === currentPlaylistId);
+        const albumName = currentJob ? currentJob.title : "SonicStream";
+
+        try {
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: track.title || "Unknown Track",
+                artist: track.uploader || "SonicStream",
+                album: albumName,
+                artwork: [
+                    {
+                        src: track.thumbnail || `https://i.ytimg.com/vi/${track.id}/hqdefault.jpg`,
+                        sizes: '512x512',
+                        type: 'image/jpeg'
+                    }
+                ]
+            });
+        } catch (e) {
+            console.error("MediaSession metadata update failed:", e);
+        }
+    }
+
+    function updateMediaSessionPositionState() {
+        if (!('mediaSession' in navigator) || !playerVideo || !playerVideo.duration || isNaN(playerVideo.duration)) return;
+        try {
+            navigator.mediaSession.setPositionState({
+                duration: playerVideo.duration,
+                playbackRate: playerVideo.playbackRate || 1,
+                position: playerVideo.currentTime
+            });
+        } catch (e) {}
+    }
+
+    // Physical Hardware Media Keys Listener (MediaPlayPause, MediaTrackNext, MediaTrackPrevious)
+    window.addEventListener("keydown", (e) => {
+        if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+
+        if (e.key === "MediaPlayPause") {
+            playerPlayPauseBtn.click();
+        } else if (e.key === "MediaTrackNext") {
+            playNextTrack();
+        } else if (e.key === "MediaTrackPrevious") {
+            playPrevTrack();
+        } else if (e.key === "MediaStop") {
+            if (playerVideo.src) {
+                playerVideo.pause();
+                playerVideo.currentTime = 0;
+                isPlaying = false;
+                updatePlayBtnUI();
+            }
+        }
+    });
+
+    initMediaSessionControls();
 });

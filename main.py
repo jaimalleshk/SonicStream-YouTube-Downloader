@@ -33,6 +33,10 @@ history_lock = threading.Lock()
 # Mount static files
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+PWA_DIR = os.path.join(BASE_DIR, "web-pwa")
+if os.path.exists(PWA_DIR):
+    app.mount("/pwa", StaticFiles(directory=PWA_DIR, html=True), name="pwa")
+
 # Global state for downloading progress
 progress_lock = threading.Lock()
 download_state = {
@@ -98,20 +102,68 @@ class ImportFolderRequest(BaseModel):
 
 
 
-import re
+def _get_pwa_config() -> dict:
+    candidates = [
+        os.path.join(BASE_DIR, "keys.json"),
+        os.path.join(BASE_DIR, "pwa_config.json"),
+        os.path.join(BASE_DIR, "web-pwa", "settings.json"),
+        os.path.join(BASE_DIR, "keys.example.json")
+    ]
+    for target_path in candidates:
+        if os.path.exists(target_path):
+            try:
+                with open(target_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if any(data.values()):
+                        return data
+            except Exception:
+                pass
+    return {}
 
-# Permanent YouTube failures: retrying these can never succeed, so they get a
-# terminal "unavailable" status instead of "error" and are excluded from
-# auto-resume (a Force All / manual selection can still retry them).
-PERMANENT_DL_ERROR_PATTERNS = (
-    "video unavailable",
-    "private video",
-    "account associated with this video has been terminated",
-    "no longer available",
-    "video has been removed",
-    "blocked it in your country",
-    "blocked in your country",
-)
+_pwa_cfg = _get_pwa_config()
+AZURE_STORAGE_ACCOUNT = os.environ.get("AZURE_STORAGE_ACCOUNT", _pwa_cfg.get("azure_storage_account", "stsonicstream"))
+AZURE_STORAGE_KEY = os.environ.get("AZURE_STORAGE_KEY", _pwa_cfg.get("azure_storage_key", ""))
+AZURE_CONTAINER = os.environ.get("AZURE_CONTAINER", _pwa_cfg.get("azure_container", "media"))
+AZURE_SAS_TOKEN = os.environ.get("AZURE_SAS_TOKEN", _pwa_cfg.get("azure_sas_token", ""))
+
+
+def auto_sync_file_to_azure(file_path: str):
+    """Background helper: automatically syncs newly downloaded media files to Azure Storage Blob for PWA mobile streaming."""
+    if not file_path or not os.path.exists(file_path):
+        return
+    def _do_upload():
+        try:
+            file_name = os.path.basename(file_path)
+            az_cmd = "az.cmd" if os.name == "nt" else "az"
+            cmd = [
+                az_cmd, "storage", "blob", "upload",
+                "--account-name", AZURE_STORAGE_ACCOUNT,
+                "--account-key", AZURE_STORAGE_KEY,
+                "--container-name", AZURE_CONTAINER,
+                "--file", file_path,
+                "--name", file_name,
+                "--overwrite"
+            ]
+            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=(os.name == "nt"))
+            if res.returncode == 0:
+                print(f"[Azure Auto-Sync] Automatically synced '{file_name}' to Azure Storage Blob stsonicstream/media!")
+            else:
+                print(f"[Azure Auto-Sync Note] Sync failed for '{file_name}' (exit code {res.returncode})")
+        except Exception as e:
+            print(f"[Azure Auto-Sync Note] Sync deferred: {e}")
+            
+    threading.Thread(target=_do_upload, daemon=True).start()
+
+def trigger_full_azure_sync():
+    """Triggers background sync of all local downloaded files to Azure Storage Blob."""
+    batch_script = os.path.join(BASE_DIR, "sync_azure_batch.py")
+    if os.path.exists(batch_script):
+        def _run_batch():
+            try:
+                subprocess.run([sys.executable, batch_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception as e:
+                print(f"[Azure Sync Error] {e}")
+        threading.Thread(target=_run_batch, daemon=True).start()
 
 def is_permanent_download_error(msg: str) -> bool:
     m = (msg or "").lower()
@@ -1544,6 +1596,46 @@ def _recount_job(job: dict):
     job["failure_count"] = sum(1 for t in items if t.get("status") in ("error", "unavailable"))
     job["completed_tracks"] = job["success_count"] + job["failure_count"]
 
+@app.get("/api/playlists/list")
+async def get_playlists_list():
+    with history_lock:
+        history = load_history()
+    playlists = []
+    for item in history:
+        if item.get("id") == "all_downloads" or item.get("deleted", False):
+            continue
+        tracks = []
+        for track in item.get("items", []):
+            f_name = track.get("file")
+            dl_url = track.get("downloadUrl")
+            if f_name and not dl_url:
+                dl_url = f"/api/media/file/{f_name}"
+            tracks.append({
+                "id": track.get("id"),
+                "title": track.get("title"),
+                "artist": track.get("uploader") or track.get("artist") or "SonicStream",
+                "duration": track.get("duration", 0),
+                "thumbnail": track.get("thumbnail") or item.get("thumbnail") or "/api/media/file/gita_cover_logo.png",
+                "url": track.get("url") or f"https://www.youtube.com/watch?v={track.get('id')}",
+                "file": f_name,
+                "downloadUrl": dl_url,
+                "status": track.status if hasattr(track, 'status') else track.get("status", "queued")
+            })
+        pl_thumb = "/api/media/file/gita_cover_logo.png" if item.get("id") == "job_bhagavad_gita_18_chapters" else (tracks[0]["thumbnail"] if tracks and tracks[0].get("thumbnail") else item.get("thumbnail"))
+        playlists.append({
+            "id": item.get("id"),
+            "title": item.get("playlist_title") or item.get("title") or "Desktop Playlist",
+            "thumbnail": pl_thumb,
+            "url": item.get("url") or "",
+            "source": "desktop",
+            "tracks": tracks
+        })
+    return {"playlists": playlists}
+
+@app.get("/api/playlists/export")
+async def get_exported_playlists():
+    return await get_playlists_list()
+
 @app.post("/api/playlists/export")
 async def export_playlists():
     with history_lock:
@@ -1972,6 +2064,36 @@ async def save_last_played(job_id: str, req: LastPlayedRequest):
         save_history(history)
     return {"message": "Playback position saved successfully"}
 
+@app.api_route("/api/media/file/{filename:path}", methods=["GET", "HEAD"])
+async def serve_media_file(filename: str):
+    filename_clean = os.path.basename(filename)
+    search_dirs = [
+        r"D:\OneDrive - Triamber\YoutubeDownloads",
+        DOWNLOAD_DIR,
+        r"D:\OneDrive\OneDrive-Projects\Scriptures Project\Gita\Kannada voice\Gita Chapters\v7"
+    ]
+    target_path = None
+    for d in search_dirs:
+        if not os.path.exists(d):
+            continue
+        p = os.path.join(d, filename_clean)
+        if os.path.exists(p):
+            target_path = p
+            break
+        for root, dirs, files in os.walk(d):
+            if filename_clean in files:
+                target_path = os.path.join(root, filename_clean)
+                break
+        if target_path:
+            break
+
+    if not target_path or not os.path.exists(target_path):
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    ext = os.path.splitext(filename_clean)[1].lower()
+    media_type = "video/mp4" if ext in (".mp4", ".mkv", ".webm") else ("image/png" if ext == ".png" else "audio/mpeg")
+    return FileResponse(target_path, media_type=media_type)
+
 @app.get("/api/media/stream")
 async def stream_media(video_url: str, title: str, format: str, download_dir: Optional[str] = None):
     target_dir = download_dir or DOWNLOAD_DIR
@@ -1997,6 +2119,24 @@ async def stream_media(video_url: str, title: str, format: str, download_dir: Op
                 return RedirectResponse(stream_url)
     except Exception as e:
         print(f"Streaming extraction failed: {e}")
+    raise HTTPException(status_code=404, detail="Media stream URL could not be resolved")
+
+@app.get("/api/media/stream-url")
+async def get_stream_url(video_url: str):
+    ydl_opts = apply_bypass_ydl_opts({
+        'quiet': True,
+        'no_warnings': True,
+        'format': 'bestaudio/best'
+    })
+    try:
+        loop = asyncio.get_event_loop()
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = await loop.run_in_executor(None, lambda: ydl.extract_info(video_url, download=False))
+            stream_url = info.get('url')
+            if stream_url:
+                return {"stream_url": stream_url}
+    except Exception as e:
+        print(f"Stream URL extraction failed: {e}")
     raise HTTPException(status_code=404, detail="Media stream URL could not be resolved")
 
 @app.post("/api/history/{job_id}/refresh")
@@ -2250,14 +2390,16 @@ def build_sync_manifest() -> dict:
         tracks = []
         for item in job.get("items", []):
             title = item.get("title", "")
+            track_id = item.get("id", "")
             entry = index.get(_clean_fuzzy_sync(title)) if title else None
+            fileName = entry["file"] if entry else (f"{title}.mp3" if title else None)
             tracks.append({
-                "file": entry["file"] if entry else None,
-                "size": entry.get("size") if entry else None,
+                "id": track_id,
                 "title": title,
-                "artist": item.get("uploader") or "Unknown Artist",
+                "artist": item.get("uploader") or item.get("artist") or "SonicStream",
                 "duration": item.get("duration") or 0,
-                "youtube_id": item.get("id", ""),
+                "file": fileName,
+                "size": entry.get("size") if entry else None,
             })
 
         playlists.append({
@@ -2265,7 +2407,7 @@ def build_sync_manifest() -> dict:
             "title": job.get("title", "Untitled"),
             "pinned": bool(job.get("pinned")),
             "track_count": len(tracks),
-            "available_count": sum(1 for t in tracks if t["file"]),
+            "available_count": sum(1 for t in tracks if t.get("file")),
             "tracks": tracks,
         })
 
@@ -2312,11 +2454,17 @@ async def sync_export_manifest(request: Request):
     """Writes playlists_manifest.json into the downloads folder, so the playlist
     structure travels with the files on any transfer path (USB copy, OneDrive)."""
     _sync_auth(request)
-    manifest = build_sync_manifest()
     out_path = os.path.join(DOWNLOAD_DIR, "playlists_manifest.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
-    return {"message": "Manifest exported", "path": out_path, "playlists": len(manifest["playlists"])}
+    pwa_manifest_path = os.path.join(BASE_DIR, "web-pwa", "playlists_manifest.json")
+    try:
+        with open(pwa_manifest_path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
+        auto_sync_file_to_azure(pwa_manifest_path)
+    except Exception:
+        pass
+    return {"message": "Manifest exported & Azure synced", "path": out_path, "playlists": len(manifest["playlists"])}
 
 # --- Wi-Fi Sync settings endpoints (desktop Settings modal only) -----------
 # These expose/modify the pairing token, so they are locked to localhost —
@@ -2401,6 +2549,26 @@ async def rotate_sync_token(request: Request):
         with open(SYNC_CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
     return _sync_config_response(cfg)
+
+# --- Azure Storage Sync Endpoints ------------------------------------------
+
+@app.get("/api/azure/config")
+async def get_azure_config():
+    """Returns public Azure Storage Blob details and SAS token for PWA app integration."""
+    return {
+        "account": AZURE_STORAGE_ACCOUNT,
+        "container": AZURE_CONTAINER,
+        "blob_base_url": f"https://{AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/{AZURE_CONTAINER}",
+        "sas_token": AZURE_SAS_TOKEN,
+        "manifest_url": f"https://{AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/{AZURE_CONTAINER}/playlists_manifest.json?{AZURE_SAS_TOKEN}"
+    }
+
+@app.post("/api/azure/sync")
+async def trigger_azure_sync():
+    """Triggers background sync of all local downloaded tracks to Azure Storage Blob."""
+    trigger_full_azure_sync()
+    return {"message": "Azure Storage Blob batch sync started in background"}
+
 
 if __name__ == "__main__":
     import uvicorn
