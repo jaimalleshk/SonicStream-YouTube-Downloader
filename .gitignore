@@ -11,3 +11,10 @@ history.json.tmp
 history.json*.corrupt-*
 history-manual-backup-*.json
 history-git-head.tmp.json
+pwa_config.json
+keys.json
+web-pwa/config.js
+web-pwa/media/
+sync_azure_batch.py
+
+
