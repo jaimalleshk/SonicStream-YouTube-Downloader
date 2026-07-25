@@ -2121,11 +2121,23 @@ document.addEventListener("DOMContentLoaded", () => {
     function updateMediaSession(track) {
         if (!("mediaSession" in navigator) || !track) return;
         try {
+            // Show real album art on the lockscreen / car head-unit. Prefer the
+            // track thumbnail (YouTube hqdefault), then the gita cover, then the
+            // app icon. (icon-512.png did not exist, so art never appeared.)
+            const artwork = [];
+            const art = getTrackThumbnailUrl(track);
+            if (art && art !== "icon.svg") {
+                const type = art.endsWith(".png") ? "image/png" : "image/jpeg";
+                artwork.push({ src: art, sizes: "480x360", type });
+                artwork.push({ src: art, sizes: "512x512", type });
+            }
+            artwork.push({ src: "icon.svg", sizes: "512x512", type: "image/svg+xml" });
+
             navigator.mediaSession.metadata = new MediaMetadata({
                 title: track.title || "Unknown Track",
                 artist: track.artist || track.uploader || "SonicStream",
                 album: "SonicStream PWA",
-                artwork: [{ src: "icon-512.png", sizes: "512x512", type: "image/png" }]
+                artwork: artwork
             });
         } catch (e) {}
     }
