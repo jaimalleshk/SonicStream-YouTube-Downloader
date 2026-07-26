@@ -154,9 +154,14 @@
             </svg>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <!-- Trace Logs / Live Console -->
+            <button class="btn btn-secondary btn-sm" id="btnToggleConsole" title="Trace Logs" style="padding: 0.3rem 0.45rem; font-size: 0.75rem; border-radius: 8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+            </button>
+
             <!-- Hard Refresh / Update (busts PWA cache to fetch latest app) -->
-            <button class="btn btn-secondary btn-sm" id="btnHardRefresh" title="Update app to latest version" style="padding: 0.3rem 0.5rem; font-size: 0.75rem; border-radius: 8px; border-color: var(--neon-blue); color: var(--neon-blue);">
+            <button class="btn btn-secondary btn-sm" id="btnHardRefresh" title="Update app to latest version" style="padding: 0.3rem 0.45rem; font-size: 0.75rem; border-radius: 8px; border-color: var(--neon-blue); color: var(--neon-blue);">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
             </button>
 
@@ -243,16 +248,16 @@
                 <div id="playerTrackArtist" style="font-size: 0.78rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">SonicStream Player</div>
             </div>
 
-            <!-- Transport Controls: Prev / Play-Pause / Next (enlarged) -->
-            <div style="display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0;">
-                <button id="playerPrevBtn" title="Previous track" style="background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 6px; display: flex; align-items: center;">
-                    <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+            <!-- Transport Controls: Prev / Play-Pause / Next (square buttons) -->
+            <div style="display: flex; align-items: center; gap: 0.3rem; flex-shrink: 0;">
+                <button id="playerPrevBtn" title="Previous track" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); cursor: pointer; width: 50px; height: 50px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
                 </button>
-                <button id="playerPlayPauseBtn" class="btn btn-primary" title="Play / Pause" style="width: 60px; height: 60px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <button id="playerPlayPauseBtn" class="btn btn-primary" title="Play / Pause" style="width: 60px; height: 60px; border-radius: 12px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                     <svg id="playIconSvg" width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 </button>
-                <button id="playerNextBtn" title="Next track" style="background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 6px; display: flex; align-items: center;">
-                    <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                <button id="playerNextBtn" title="Next track" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); cursor: pointer; width: 50px; height: 50px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
                 </button>
             </div>
         </div>

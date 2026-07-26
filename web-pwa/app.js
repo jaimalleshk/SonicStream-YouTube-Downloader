@@ -219,15 +219,9 @@ document.addEventListener("DOMContentLoaded", () => {
         btnToggleConsole.addEventListener("click", openLiveConsoleModal);
     }
 
-    // Create glowing bottom-right floating Trace Logs button on screen
-    if (!document.getElementById("btnFloatingConsole")) {
-        const floatBtn = document.createElement("button");
-        floatBtn.id = "btnFloatingConsole";
-        floatBtn.innerHTML = "📟 Trace Logs";
-        floatBtn.style.cssText = "position: fixed; bottom: 85px; right: 20px; z-index: 99999; background: #090d16; color: #00f2fe; border: 1px solid #00f2fe; border-radius: 20px; padding: 8px 16px; font-weight: bold; font-size: 0.8rem; cursor: pointer; box-shadow: 0 4px 15px rgba(0,242,254,0.3);";
-        floatBtn.onclick = openLiveConsoleModal;
-        document.body.appendChild(floatBtn);
-    }
+    // (Removed the floating bottom-right Trace Logs button — it overlapped the
+    // docked player's Play control. Trace Logs now lives in the top header of
+    // both desktop and mobile via #btnToggleConsole.)
 
     if (btnCloseSettings && settingsModal) {
         btnCloseSettings.addEventListener("click", () => {
