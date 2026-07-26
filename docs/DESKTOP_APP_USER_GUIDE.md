@@ -8,7 +8,30 @@ A friendly, step-by-step guide for everyday use. No technical knowledge needed.
 
 ---
 
-## 1. Opening the app
+## 1. Getting the app (first time only — download from GitHub)
+
+You need a copy of the app on your PC. Two easy ways:
+
+**Easiest — download the ZIP (no tools needed):**
+1. Open the project page: **https://github.com/jaimalleshk/SonicStream-YouTube-Downloader**
+2. Click the green **Code** button → **Download ZIP**.
+3. **Extract** the ZIP (right-click → *Extract All*) to a folder like `Documents\SonicStream`.
+
+**Or — with Git (if you have it):**
+```bash
+git clone https://github.com/jaimalleshk/SonicStream-YouTube-Downloader.git
+```
+
+**First-time setup (one time):** the app needs Python and a few components. If a
+`requirements.txt` and a setup/run script are included, run the setup step once
+(e.g. double-click the setup `.bat`, or in a terminal run
+`pip install -r requirements.txt`). After that, you launch it normally (next
+section). If you're not sure, ask whoever shared this with you for the exact
+first-run step for your PC.
+
+---
+
+## 2. Opening the app
 
 Double-click **SonicStream** (the `SonicStream.bat` shortcut, or the app icon).
 A window opens on your desktop — you don't need a web browser, and you don't
