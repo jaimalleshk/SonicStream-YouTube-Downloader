@@ -2071,77 +2071,43 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Revoke previous blob object URL to avoid leaks across background advances.
-    let currentObjectUrl = null;
-    function setAudioBlobSrc(blob) {
-        if (currentObjectUrl) { try { URL.revokeObjectURL(currentObjectUrl); } catch (_) {} }
-        currentObjectUrl = URL.createObjectURL(blob);
-        audioElement.src = currentObjectUrl;
-    }
-
     // Background track advancement (screen off / app backgrounded).
-    // IndexedDB-FIRST for reliability: a cached blob plays instantly from local
-    // storage (no network, no stall). If the track isn't cached we stream it
-    // directly from Azure — but WITHOUT a second concurrent fetch. (The previous
-    // version re-downloaded the whole file to auto-cache it WHILE the same file
-    // was streaming; the doubled bandwidth starved the audio buffer and stalled
-    // playback mid-song, and the stalled stream could not be resumed.) Caching is
-    // handled proactively by the foreground prefetch, and we top the cache up for
-    // the FOLLOWING tracks only when the current one is playing from cache (so we
-    // never contend with an in-flight stream).
+    // STABLE, MINIMAL version (reverted): build the media URL SYNCHRONOUSLY and
+    // call play() with zero async gap, so the iOS audio session is never suspended
+    // during the transition. Deliberately NO background fetch/prefetch and NO async
+    // IndexedDB read here — those were throttled/killed by iOS and stalled playback
+    // after a few tracks. The <audio> element streams progressively from Azure;
+    // falls back to full playTrack() on error. (Offline/cached background playback
+    // is a future enhancement — see issue #22.)
     function playNextTrackBackground() {
         if (playQueue.length === 0) return;
         const nextIdx = (currentTrackIndex + 1) % playQueue.length;
         const nextTrack = playQueue[nextIdx];
         if (!nextTrack) return;
 
-        // Synchronous Azure fallback URL (zero async cost)
         const targetFile = nextTrack.file || (nextTrack.title ? `${nextTrack.title}.mp3` : null);
-        let azureUrl = nextTrack.downloadUrl || null;
-        if (!azureUrl && targetFile) {
+        let mediaUrl = nextTrack.downloadUrl || null;
+        if (!mediaUrl && targetFile) {
             const sasToken = getAzureSASToken();
-            azureUrl = sasToken ? `${getAzureBlobBaseUrl()}/${encodeURIComponent(targetFile)}?${sasToken}` : null;
+            if (sasToken) mediaUrl = `${getAzureBlobBaseUrl()}/${encodeURIComponent(targetFile)}?${sasToken}`;
         }
+        if (!mediaUrl) { playNextTrack(); return; }
 
         currentTrackIndex = nextIdx;
         isPlaying = true;
-
-        // Race the IndexedDB read against a short timeout so the gapless
-        // transition never hangs. Cached blob -> instant local play; else stream.
-        const dbRead = getTrackRecordFromDB(nextTrack.id, nextTrack.title).catch(() => null);
-        const timeout = new Promise(r => setTimeout(() => r("timeout"), 700));
-
-        Promise.race([dbRead, timeout]).then(record => {
-            const cached = record && record !== "timeout" && record.blob;
-            if (cached) {
-                setAudioBlobSrc(record.blob);
-                setPlaybackSource("cache");
-                console.log("[Audio Engine] Background: playing from IndexedDB cache");
-            } else if (azureUrl) {
-                audioElement.src = azureUrl;
-                setPlaybackSource("stream");
-                lastPlaybackWasStream = true;
-                console.log("[Audio Engine] Background: streaming from Azure (no double-download)");
-            } else {
-                playTrack(nextTrack, playQueue, nextIdx);
-                return;
-            }
-
-            audioElement.play().then(() => {
-                updatePlayBtnUI();
-                updateMediaSession(nextTrack);
-                if (playerTrackTitle) playerTrackTitle.textContent = nextTrack.title || "";
-                if (playerTrackArtist) playerTrackArtist.textContent = nextTrack.artist || nextTrack.uploader || "SonicStream";
-                const thumbUrl = getTrackThumbnailUrl(nextTrack);
-                if (playerTrackThumb) playerTrackThumb.src = thumbUrl;
-                if (activePlaylistId) saveResumePosition(activePlaylistId, nextTrack.id, 0, nextIdx);
-
-                // Keep the cache warm for upcoming tracks, but ONLY when the
-                // current track is playing from local cache (no in-flight stream
-                // to contend with) — this is what makes it durable without stalls.
-                if (cached) prefetchUpcomingTracks(playQueue, currentTrackIndex, 2);
-            }).catch(() => {
-                playTrack(nextTrack, playQueue, nextIdx);
-            });
+        lastPlaybackWasStream = true;
+        audioElement.src = mediaUrl;
+        audioElement.play().then(() => {
+            updatePlayBtnUI();
+            updateMediaSession(nextTrack);
+            setPlaybackSource("stream");
+            if (playerTrackTitle) playerTrackTitle.textContent = nextTrack.title || "";
+            if (playerTrackArtist) playerTrackArtist.textContent = nextTrack.artist || nextTrack.uploader || "SonicStream";
+            const thumbUrl = getTrackThumbnailUrl(nextTrack);
+            if (playerTrackThumb) playerTrackThumb.src = thumbUrl;
+            if (activePlaylistId) saveResumePosition(activePlaylistId, nextTrack.id, 0, nextIdx);
+        }).catch(() => {
+            playTrack(nextTrack, playQueue, nextIdx);
         });
     }
 
