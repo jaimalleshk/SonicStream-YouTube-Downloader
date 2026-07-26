@@ -1407,13 +1407,14 @@ document.addEventListener("DOMContentLoaded", () => {
                         <button class="play-sidebar-btn" title="Play Playlist" style="background: transparent; border: none; cursor: pointer; color: var(--neon-blue); padding: 2px 4px; font-size: 1.05rem;">▶️</button>
                         <button class="resume-sidebar-btn" title="Resume Playlist" style="background: transparent; border: none; cursor: pointer; color: var(--neon-purple); padding: 2px 4px; font-size: 1.05rem;">⏯️</button>
                         <button class="download-sidebar-btn" title="Download All Tracks to IndexedDB" style="background: transparent; border: none; cursor: pointer; color: var(--neon-blue); padding: 2px 4px; font-size: 1.05rem;">⬇️</button>
+                        <button class="shuffle-sidebar-btn" title="Shuffle Play" style="background: transparent; border: none; cursor: pointer; color: var(--text-secondary); padding: 2px 4px; font-size: 1.05rem;">🔀</button>
                         <button class="pin-sidebar-btn" title="Pin Playlist" style="background: transparent; border: none; cursor: pointer; color: var(--text-muted); padding: 2px 4px; font-size: 1.05rem;">📌</button>
                         <button class="delete-sidebar-btn" title="Delete Playlist" style="background: transparent; border: none; cursor: pointer; color: #ff5f56; padding: 2px 4px; font-size: 1.05rem;">🗑️</button>
                     </div>
                 </div>
             `;
 
-            row.querySelector(".download-sidebar-btn").addEventListener("click", async () => {
+            row.querySelector(".download-sidebar-btn")?.addEventListener("click", async () => {
                 selectPlaylist(pl);
                 const dlBtn = row.querySelector(".download-sidebar-btn");
                 dlBtn.textContent = "⏳";
@@ -1433,17 +1434,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
 
-            row.querySelector(".play-sidebar-btn").addEventListener("click", () => {
+            row.querySelector(".play-sidebar-btn")?.addEventListener("click", () => {
                 selectPlaylist(pl);
                 if (pl.tracks && pl.tracks.length > 0) playTrack(pl.tracks[0], pl.tracks, 0);
             });
 
-            row.querySelector(".resume-sidebar-btn").addEventListener("click", () => {
+            row.querySelector(".resume-sidebar-btn")?.addEventListener("click", () => {
                 selectPlaylist(pl);
                 resumePlaylist(pl);
             });
 
-            row.querySelector(".shuffle-sidebar-btn").addEventListener("click", () => {
+            row.querySelector(".shuffle-sidebar-btn")?.addEventListener("click", () => {
                 selectPlaylist(pl);
                 if (pl.tracks && pl.tracks.length > 0) {
                     const shuffled = [...pl.tracks].sort(() => Math.random() - 0.5);
@@ -1451,13 +1452,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
 
-            row.querySelector(".pin-sidebar-btn").addEventListener("click", () => {
+            row.querySelector(".pin-sidebar-btn")?.addEventListener("click", () => {
                 pl.isPinned = !pl.isPinned;
                 savePlaylistToDB(pl);
                 renderSidebarList();
             });
 
-            row.querySelector(".delete-sidebar-btn").addEventListener("click", async () => {
+            row.querySelector(".delete-sidebar-btn")?.addEventListener("click", async () => {
                 if (confirm(`Delete playlist "${pl.title}"?`)) {
                     if (db) {
                         const tx = db.transaction("playlists", "readwrite");
