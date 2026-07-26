@@ -2105,8 +2105,11 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        // Default 0 = gapless. A silent gap between tracks can let iOS end the
+        // audio session, so we never pause unless the user explicitly opts in
+        // (desktop setting) AND we're in the foreground.
         const pauseInput = document.getElementById("playerPauseSeconds");
-        const pauseSecs = pauseInput ? parseInt(pauseInput.value) : 5;
+        const pauseSecs = pauseInput ? (parseInt(pauseInput.value) || 0) : 0;
         const isBackground = document.hidden || (typeof document.webkitHidden !== "undefined" && document.webkitHidden);
 
         if (pauseSecs > 0 && !isBackground) {

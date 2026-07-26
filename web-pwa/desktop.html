@@ -175,7 +175,7 @@
                 <section class="card playlist-sidebar">
                     <div class="sidebar-header">
                         <h3>Playlists</h3>
-                        <button id="btnSyncOneDriveNow" class="btn btn-secondary btn-sm" title="Sync Playlists with OneDrive">
+                        <button id="btnSyncOneDriveNow" class="btn btn-secondary btn-sm" title="Sync playlists from cloud">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                             Sync
                         </button>
@@ -295,7 +295,7 @@
                                 </tr>
                             </thead>
                             <tbody id="playlistTableBody">
-                                <tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">Sign in to OneDrive, paste YouTube URL, or click "Import Local Files" above.</td></tr>
+                                <tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">Select a playlist from the sidebar to view its tracks.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -355,14 +355,9 @@
                     <p class="help-text">Enables 100% cloud audio/video streaming & manifest sync directly from Azure Storage Blob (stsonicstream/media).</p>
                 </div>
 
-                <hr class="divider">
-
-                <!-- OneDrive Share Link / Music Folder Config -->
-                <div class="settings-section">
-                    <h4>OneDrive Share Link / Folder</h4>
-                    <input type="text" id="oneDriveFolderNameInput" placeholder="Paste OneDrive Share Link or folder name...">
-                    <p class="help-text">Default uses your public read-only OneDrive share link. You can also type a folder name like YoutubeDownloads.</p>
-                </div>
+                <!-- OneDrive removed: all audio streams from Azure Blob (uploaded from the
+                     desktop app). Hidden stub kept so the shared engine's guards stay happy. -->
+                <input type="hidden" id="oneDriveFolderNameInput" value="">
 
                 <hr class="divider">
 
@@ -384,7 +379,7 @@
                     <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem;">
                         <span>Next Song Pause Delay:</span>
                         <div style="display: flex; align-items: center; gap: 0.35rem;">
-                            <input type="number" id="playerPauseSeconds" value="5" min="0" max="300" style="width: 50px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 2px 4px; font-size: 0.8rem; text-align: center; font-family: var(--font-mono); outline: none;">
+                            <input type="number" id="playerPauseSeconds" value="0" min="0" max="300" style="width: 50px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 2px 4px; font-size: 0.8rem; text-align: center; font-family: var(--font-mono); outline: none;">
                             <span>sec</span>
                         </div>
                     </div>
