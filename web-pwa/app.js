@@ -1552,18 +1552,17 @@ document.addEventListener("DOMContentLoaded", () => {
             card.style.padding = "0.6rem 0.85rem";
             card.style.marginBottom = "0.5rem";
             card.innerHTML = `
-                <div class="mpc-main" style="display: flex; align-items: center; gap: 0.75rem; min-width: 0; flex: 1;">
-                    <img src="${thumb}" class="mobile-card-thumb" style="width: 42px; height: 42px; border-radius: 8px; object-fit: cover; flex-shrink: 0;" onerror="this.onerror=null; this.src='gita_cover_logo.png'">
+                <div class="mpc-main" style="display: flex; align-items: center; gap: 0.85rem; min-width: 0; flex: 1;">
+                    <img src="${thumb}" class="mobile-card-thumb" style="width: 58px; height: 58px; border-radius: 10px; object-fit: cover; flex-shrink: 0;" onerror="this.onerror=null; this.src='gita_cover_logo.png'">
                     <div class="mobile-card-info" style="min-width: 0; flex: 1;">
-                        <div class="mobile-card-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.9rem; font-weight: 600;">${pl.isPinned ? '📌 ' : ''}${pl.title || 'Untitled Playlist'}</div>
-                        <div class="mobile-card-subtitle" style="font-size: 0.75rem; color: var(--text-secondary);">${trackCount} tracks</div>
+                        <div class="mobile-card-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1.8rem; font-weight: 700; line-height: 1.15;">${pl.isPinned ? '📌 ' : ''}${pl.title || 'Untitled Playlist'}</div>
+                        <div class="mobile-card-subtitle" style="font-size: 1.5rem; color: var(--text-secondary);">${trackCount} tracks</div>
                     </div>
                 </div>
                 <div class="mpc-actions" style="display: flex; gap: 0.25rem; align-items: center; flex-shrink: 0;" onclick="event.stopPropagation();">
-                    <button class="pa-play" title="Play" style="background: transparent; border: none; cursor: pointer; padding: 6px; font-size: 1.4rem;">▶️</button>
-                    <button class="pa-shuffle" title="Shuffle play" style="background: transparent; border: none; cursor: pointer; padding: 6px; font-size: 1.4rem;">🔀</button>
-                    <button class="pa-resume" title="Resume" style="background: transparent; border: none; cursor: pointer; padding: 6px; font-size: 1.4rem;">⏯️</button>
-                    <button class="pa-download" title="Download" style="background: transparent; border: none; cursor: pointer; padding: 6px; font-size: 1.4rem;">⬇️</button>
+                    <button class="pa-play" title="Play" style="background: transparent; border: none; cursor: pointer; padding: 6px; font-size: 1.6rem;">▶️</button>
+                    <button class="pa-shuffle" title="Shuffle play" style="background: transparent; border: none; cursor: pointer; padding: 6px; font-size: 1.6rem;">🔀</button>
+                    <button class="pa-resume" title="Resume" style="background: transparent; border: none; cursor: pointer; padding: 6px; font-size: 1.6rem;">⏯️</button>
                 </div>
             `;
             card.querySelector(".mpc-main").addEventListener("click", () => showMobilePlaylistTracks(pl));
