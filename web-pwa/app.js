@@ -591,7 +591,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return title.toLowerCase().replace(/[^a-z0-9]/g, "");
     }
 
-    const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB Hard File Size Limit
+    const MAX_FILE_SIZE_BYTES = 60 * 1024 * 1024; // 60 MB per-file cache cap; larger files stream live from Azure
 
     async function purgeLargeFilesFromDB() {
         if (!db || !db.objectStoreNames.contains("files")) return;
@@ -1843,6 +1843,36 @@ document.addEventListener("DOMContentLoaded", () => {
         renderTracksTable(filtered);
     });
 
+    // Small badge on the player showing whether the current track is playing from
+    // the local IndexedDB cache or streaming live from Azure (and a clear hint if
+    // a live stream fails because the SAS token is missing).
+    function setPlaybackSource(source) {
+        let el = document.getElementById("playbackSourceIcon");
+        if (!el) {
+            if (!playerTrackTitle || !playerTrackTitle.parentNode) return;
+            el = document.createElement("span");
+            el.id = "playbackSourceIcon";
+            el.style.cssText = "display: inline-block; margin-top: 2px; font-size: 0.68rem; font-weight: 600; padding: 1px 7px; border-radius: 6px; white-space: nowrap;";
+            playerTrackTitle.parentNode.insertBefore(el, playerTrackTitle.nextSibling);
+        }
+        if (source === "cache") {
+            el.textContent = "💾 Offline (cached)";
+            el.style.background = "rgba(39,201,63,0.15)"; el.style.color = "#27c93f";
+        } else if (source === "stream") {
+            el.textContent = "☁️ Streaming";
+            el.style.background = "rgba(0,242,254,0.15)"; el.style.color = "var(--neon-blue)";
+        } else if (source === "error-sas") {
+            el.textContent = "⚠️ Stream failed — set SAS token in Settings";
+            el.style.background = "rgba(255,95,86,0.15)"; el.style.color = "#ff5f56";
+        } else if (source === "error") {
+            el.textContent = "⚠️ Playback error";
+            el.style.background = "rgba(255,95,86,0.15)"; el.style.color = "#ff5f56";
+        } else {
+            el.textContent = ""; el.style.background = "transparent";
+        }
+    }
+    let lastPlaybackWasStream = false;
+
     // --- Audio Engine & MediaSession Controls ---
     async function playTrack(track, queue, index) {
         if (!track) return;
@@ -1867,19 +1897,27 @@ document.addEventListener("DOMContentLoaded", () => {
             const streamFormat = isVideoTrack ? "video" : "audio";
 
             // 1. Check IndexedDB for High-Quality cached Blob (100% offline driving playback!)
+            let fromCache = false;
+            let sasMissing = false;
             const cachedRecord = await getTrackRecordFromDB(track.id, track.title);
             if (cachedRecord && cachedRecord.blob) {
                 mediaUrl = URL.createObjectURL(cachedRecord.blob);
                 if (cachedRecord.thumbBlob) {
                     playerTrackThumb.src = URL.createObjectURL(cachedRecord.thumbBlob);
                 }
-                console.log("[PWA Player] Playing 100% offline high-quality media from IndexedDB!");
+                fromCache = true;
+                console.log("[PWA Player] Playing offline cached media from IndexedDB.");
             } else if (track.downloadUrl) {
                 mediaUrl = track.downloadUrl;
             } else if (targetFile) {
                 if (window.location.protocol.startsWith("https") || window.location.hostname.includes("azurestaticapps.net")) {
                     const sasToken = getAzureSASToken();
+                    if (!sasToken) {
+                        sasMissing = true;
+                        console.warn("[PWA Player] No Azure SAS token set — live streaming will fail. Paste your SAS token in Settings.");
+                    }
                     mediaUrl = `${getAzureBlobBaseUrl()}/${encodeURIComponent(targetFile)}?${sasToken}`;
+                    console.log("[PWA Player] Streaming live from Azure: " + getAzureBlobBaseUrl() + "/" + encodeURIComponent(targetFile));
                 } else {
                     mediaUrl = `/api/media/file/${encodeURIComponent(targetFile)}`;
                 }
@@ -1890,6 +1928,9 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             if (!mediaUrl) throw new Error("Media stream URL unavailable");
+
+            lastPlaybackWasStream = !fromCache;
+            setPlaybackSource(fromCache ? "cache" : (sasMissing ? "error-sas" : "stream"));
 
             if (mediaUrl.startsWith("/")) {
                 mediaUrl = (window.location.protocol.startsWith("http") ? window.location.origin : "http://127.0.0.1:8765") + mediaUrl;
@@ -1934,6 +1975,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 audioElement.src = mediaUrl;
                 audioElement.onerror = () => {
                     console.warn(`[Audio Engine] Direct URL playback failed for '${track.title}'. Trying stream fallback...`);
+                    // A failed LIVE stream on the deployed site almost always means the
+                    // SAS token is missing/expired — surface that on the player.
+                    if (lastPlaybackWasStream) {
+                        setPlaybackSource(getAzureSASToken() ? "error" : "error-sas");
+                        if (playerStatusText) playerStatusText.textContent = getAzureSASToken() ? "Stream error" : "Set Azure SAS token in Settings to stream";
+                    }
                     if (track.id && track.id.length === 11) {
                         const fallbackUrl = `/api/media/stream?video_url=${encodeURIComponent('https://www.youtube.com/watch?v=' + track.id)}&title=${encodeURIComponent(track.title)}&format=audio`;
                         const fullFallback = (window.location.protocol.startsWith("http") ? window.location.origin : "http://127.0.0.1:8765") + fallbackUrl;
@@ -2067,9 +2114,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const cached = record && record !== "timeout" && record.blob;
             if (cached) {
                 setAudioBlobSrc(record.blob);
+                setPlaybackSource("cache");
                 console.log("[Audio Engine] Background: playing from IndexedDB cache");
             } else if (azureUrl) {
                 audioElement.src = azureUrl;
+                setPlaybackSource("stream");
+                lastPlaybackWasStream = true;
                 console.log("[Audio Engine] Background: streaming from Azure (no double-download)");
             } else {
                 playTrack(nextTrack, playQueue, nextIdx);
