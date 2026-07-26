@@ -111,6 +111,12 @@ mv ./_media_tmp web-pwa/media
 
 ## 6. Change Log (most recent first)
 
+- **Claude Code (7122848):** removed OneDrive UI (dead weight — audio is on
+  Azure); between-track pause defaults to 0/gapless (a silent gap can let iOS
+  drop the session; background never pauses); visible settings-modal scrollbar.
+- **Claude Code (f13b619):** Trace Logs moved into the header (removed the
+  floating button that overlapped Play); mobile transport buttons made square +
+  bigger (play 60px r12, prev/next 50px squares).
 - **Claude Code (08ea75e):** fixed screen-off mid-song stall (removed the
   double-download; IndexedDB-first advance); lock-screen Next/Prev (dropped seek
   handlers); bigger mobile player controls (60px play); mobile volume
