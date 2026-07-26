@@ -1857,6 +1857,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (source === "cache") {
             el.textContent = "💾 Offline (cached)";
             el.style.background = "rgba(39,201,63,0.15)"; el.style.color = "#27c93f";
+        } else if (source === "downloading") {
+            el.textContent = "⬇️ Downloading…";
+            el.style.background = "rgba(0,242,254,0.15)"; el.style.color = "var(--neon-blue)";
         } else if (source === "stream") {
             el.textContent = "☁️ Streaming";
             el.style.background = "rgba(0,242,254,0.15)"; el.style.color = "var(--neon-blue)";
@@ -1932,8 +1935,34 @@ document.addEventListener("DOMContentLoaded", () => {
                         sasMissing = true;
                         console.warn("[PWA Player] No Azure SAS token set — live streaming will fail. Paste your SAS token in Settings.");
                     }
-                    mediaUrl = `${getAzureBlobBaseUrl()}/${encodeURIComponent(targetFile)}?${sasToken}`;
-                    console.log("[PWA Player] Streaming live from Azure: " + getAzureBlobBaseUrl() + "/" + encodeURIComponent(targetFile));
+                    const azureUrl = `${getAzureBlobBaseUrl()}/${encodeURIComponent(targetFile)}?${sasToken}`;
+                    mediaUrl = azureUrl; // default: live stream
+                    // Download-then-play: only when the SCREEN IS ON (foreground) do we
+                    // fetch a normal-size file fully, cache it, then play from the blob
+                    // — reliable, builds the offline library, and the download time is
+                    // the natural gap between songs. SCREEN OFF (background) or a LARGE
+                    // file (> cap) streams live instead: a background fetch gets
+                    // throttled by iOS, and a big download would block playback too long.
+                    if (sasToken && !document.hidden) {
+                        try {
+                            if (playerStatusText) playerStatusText.textContent = "Downloading…";
+                            setPlaybackSource("downloading");
+                            const res = await fetch(azureUrl);
+                            const len = parseInt((res && res.headers.get("content-length")) || "0", 10);
+                            if (res && res.ok && len > 0 && len <= MAX_FILE_SIZE_BYTES) {
+                                const blob = await res.blob();
+                                await saveTrackBlobToDB(track.id, blob, track);
+                                mediaUrl = objectUrlFor(blob, "audio");
+                                fromCache = true; // now playing from the freshly-cached blob
+                                console.log("[PWA Player] Downloaded + cached, playing from blob: " + targetFile);
+                            } else {
+                                console.log("[PWA Player] Large/unknown-size file — streaming live: " + targetFile + " (" + len + " bytes)");
+                            }
+                        } catch (e) {
+                            console.warn("[PWA Player] Download-then-play failed, streaming live:", e);
+                            mediaUrl = azureUrl;
+                        }
+                    }
                 } else {
                     mediaUrl = `/api/media/file/${encodeURIComponent(targetFile)}`;
                 }
@@ -2102,28 +2131,43 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!nextTrack) return;
 
         const targetFile = nextTrack.file || (nextTrack.title ? `${nextTrack.title}.mp3` : null);
-        let mediaUrl = nextTrack.downloadUrl || null;
-        if (!mediaUrl && targetFile) {
+        let azureUrl = nextTrack.downloadUrl || null;
+        if (!azureUrl && targetFile) {
             const sasToken = getAzureSASToken();
-            if (sasToken) mediaUrl = `${getAzureBlobBaseUrl()}/${encodeURIComponent(targetFile)}?${sasToken}`;
+            if (sasToken) azureUrl = `${getAzureBlobBaseUrl()}/${encodeURIComponent(targetFile)}?${sasToken}`;
         }
-        if (!mediaUrl) { playNextTrack(); return; }
 
         currentTrackIndex = nextIdx;
         isPlaying = true;
-        lastPlaybackWasStream = true;
-        audioElement.src = mediaUrl;
-        audioElement.play().then(() => {
+
+        const applyMeta = (isStream) => {
             updatePlayBtnUI();
             updateMediaSession(nextTrack);
-            setPlaybackSource("stream");
+            setPlaybackSource(isStream ? "stream" : "cache");
+            lastPlaybackWasStream = isStream;
             if (playerTrackTitle) playerTrackTitle.textContent = nextTrack.title || "";
             if (playerTrackArtist) playerTrackArtist.textContent = nextTrack.artist || nextTrack.uploader || "SonicStream";
-            const thumbUrl = getTrackThumbnailUrl(nextTrack);
-            if (playerTrackThumb) playerTrackThumb.src = thumbUrl;
+            if (playerTrackThumb) playerTrackThumb.src = getTrackThumbnailUrl(nextTrack);
             if (activePlaylistId) saveResumePosition(activePlaylistId, nextTrack.id, 0, nextIdx);
-        }).catch(() => {
-            playTrack(nextTrack, playQueue, nextIdx);
+        };
+
+        // Prefer a cached blob (reliable, no network — this is what makes screen-off
+        // playback continue). If not cached, stream live. NO background download
+        // (iOS throttles it and it stalls). Race a short timeout so the gapless
+        // transition never hangs on a slow DB read.
+        const dbRead = getTrackRecordFromDB(nextTrack.id, nextTrack.title).catch(() => null);
+        const timeout = new Promise(r => setTimeout(() => r("timeout"), 500));
+        Promise.race([dbRead, timeout]).then(record => {
+            const cached = record && record !== "timeout" && record.blob;
+            if (cached) {
+                audioElement.src = objectUrlFor(record.blob, "audio");
+                audioElement.play().then(() => applyMeta(false)).catch(() => playTrack(nextTrack, playQueue, nextIdx));
+            } else if (azureUrl) {
+                audioElement.src = azureUrl;
+                audioElement.play().then(() => applyMeta(true)).catch(() => playTrack(nextTrack, playQueue, nextIdx));
+            } else {
+                playTrack(nextTrack, playQueue, nextIdx);
+            }
         });
     }
 
