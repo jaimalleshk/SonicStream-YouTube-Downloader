@@ -1564,10 +1564,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="mobile-card-subtitle" style="font-size: 0.75rem; color: var(--text-secondary);">${trackCount} tracks</div>
                     </div>
                 </div>
-                <div class="mpc-actions" style="display: flex; gap: 0.2rem; align-items: center; flex-shrink: 0;" onclick="event.stopPropagation();">
-                    <button class="pa-play" title="Play" style="background: transparent; border: none; cursor: pointer; padding: 4px; font-size: 1.1rem;">▶️</button>
-                    <button class="pa-resume" title="Resume" style="background: transparent; border: none; cursor: pointer; padding: 4px; font-size: 1.1rem;">⏯️</button>
-                    <button class="pa-download" title="Download" style="background: transparent; border: none; cursor: pointer; padding: 4px; font-size: 1.1rem;">⬇️</button>
+                <div class="mpc-actions" style="display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0;" onclick="event.stopPropagation();">
+                    <button class="pa-play" title="Play" style="background: transparent; border: none; cursor: pointer; padding: 8px; font-size: 1.5rem;">▶️</button>
+                    <button class="pa-resume" title="Resume" style="background: transparent; border: none; cursor: pointer; padding: 8px; font-size: 1.5rem;">⏯️</button>
+                    <button class="pa-download" title="Download" style="background: transparent; border: none; cursor: pointer; padding: 8px; font-size: 1.5rem;">⬇️</button>
                 </div>
             `;
             card.querySelector(".mpc-main").addEventListener("click", () => showMobilePlaylistTracks(pl));
@@ -2019,6 +2019,49 @@ document.addEventListener("DOMContentLoaded", () => {
         playTrack(playQueue[prevIdx], playQueue, prevIdx);
     }
 
+    // Lightweight background track advancement — keeps iOS audio session alive
+    // by building the media URL synchronously and calling play() with zero async gap.
+    // Falls back to full playTrack() only if a sync URL can't be constructed.
+    function playNextTrackBackground() {
+        if (playQueue.length === 0) return;
+        const nextIdx = (currentTrackIndex + 1) % playQueue.length;
+        const nextTrack = playQueue[nextIdx];
+        if (!nextTrack) return;
+
+        const targetFile = nextTrack.file || (nextTrack.title ? `${nextTrack.title}.mp3` : null);
+        let mediaUrl = nextTrack.downloadUrl || null;
+
+        if (!mediaUrl && targetFile) {
+            const sasToken = getAzureSASToken();
+            if (sasToken) {
+                mediaUrl = `${getAzureBlobBaseUrl()}/${encodeURIComponent(targetFile)}?${sasToken}`;
+            }
+        }
+
+        if (!mediaUrl) {
+            playNextTrack();
+            return;
+        }
+
+        currentTrackIndex = nextIdx;
+        isPlaying = true;
+        audioElement.src = mediaUrl;
+        audioElement.play().then(() => {
+            updatePlayBtnUI();
+            updateMediaSession(nextTrack);
+            if (playerTrackTitle) playerTrackTitle.textContent = nextTrack.title || "";
+            if (playerTrackArtist) playerTrackArtist.textContent = nextTrack.artist || nextTrack.uploader || "SonicStream";
+            const thumbUrl = getTrackThumbnailUrl(nextTrack);
+            if (playerTrackThumb) playerTrackThumb.src = thumbUrl;
+            if (activePlaylistId) saveResumePosition(activePlaylistId, nextTrack.id, 0, nextIdx);
+        }).catch(() => {
+            playTrack(nextTrack, playQueue, nextIdx);
+        });
+    }
+
+    // Referenced by audio error handlers but was never defined — prevents ReferenceError
+    function playNextTrackAuto() { playNextTrack(); }
+
     if (audioElement) audioElement.addEventListener("ended", () => {
         clearNextTrackTimers();
         if (isRepeat) {
@@ -2052,7 +2095,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }, pauseSecs * 1000);
         } else {
             console.log("[Audio Engine] Background/screen-off state detected. Advancing next track immediately to maintain OS wake lock.");
-            playNextTrack();
+            playNextTrackBackground();
         }
     });
 
@@ -2175,11 +2218,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     audioElement.currentTime = details.seekTime;
                 }
             });
-            // Do NOT register seekbackward/seekforward: iOS shows 15s skip buttons
-            // in their place and hides Next/Previous on the lock screen and in the
-            // car. We want Next/Previous, so leave these explicitly unset.
-            navigator.mediaSession.setActionHandler("seekbackward", null);
-            navigator.mediaSession.setActionHandler("seekforward", null);
         } catch (e) {
             console.warn("[MediaSession] AVRCP registration note:", e);
         }
