@@ -228,33 +228,43 @@
         <!-- Audio playback sink (required by the shared player engine) -->
         <audio id="audioElement" preload="metadata"></audio>
 
-        <div style="display: flex; align-items: center; gap: 0.6rem;">
-            <img id="playerTrackThumb" src="icon.svg" style="width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: #222; flex-shrink: 0;">
+        <!-- Volume popup (toggled by the volume button; slides up above the bar) -->
+        <div id="volumePopup" style="display: none; position: absolute; bottom: 100%; left: 1rem; margin-bottom: 0.6rem; background: rgba(13,17,23,0.98); border: 1px solid var(--neon-blue); border-radius: 14px; padding: 0.85rem 1rem; box-shadow: 0 -6px 24px rgba(0,0,0,0.6); align-items: center; gap: 0.7rem;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="color: var(--neon-blue); flex-shrink: 0;"><path d="M3 9v6h4l5 5V4L7 9H3z"/></svg>
+            <input type="range" id="playerVolumeSlider" min="0" max="100" value="100" style="width: 160px; accent-color: var(--neon-blue);">
+            <span id="volumePct" style="font-size: 0.8rem; color: var(--text-secondary); min-width: 40px; text-align: right;">100%</span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.65rem;">
+            <img id="playerTrackThumb" src="icon.svg" style="width: 52px; height: 52px; border-radius: 10px; object-fit: cover; background: #222; flex-shrink: 0;">
 
             <div style="flex: 1; min-width: 0;">
-                <div id="playerTrackTitle" style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Select a track</div>
-                <div id="playerTrackArtist" style="font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">SonicStream Player</div>
+                <div id="playerTrackTitle" style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Select a track</div>
+                <div id="playerTrackArtist" style="font-size: 0.78rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">SonicStream Player</div>
             </div>
 
-            <!-- Transport Controls: Prev / Play-Pause / Next -->
-            <div style="display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
+            <!-- Transport Controls: Prev / Play-Pause / Next (enlarged) -->
+            <div style="display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0;">
                 <button id="playerPrevBtn" title="Previous track" style="background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 6px; display: flex; align-items: center;">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
                 </button>
-                <button id="playerPlayPauseBtn" class="btn btn-primary" title="Play / Pause" style="width: 46px; height: 46px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                    <svg id="playIconSvg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                <button id="playerPlayPauseBtn" class="btn btn-primary" title="Play / Pause" style="width: 60px; height: 60px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <svg id="playIconSvg" width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 </button>
                 <button id="playerNextBtn" title="Next track" style="background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 6px; display: flex; align-items: center;">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
                 </button>
             </div>
         </div>
 
-        <!-- Mobile Progress Bar -->
-        <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
-            <span id="playerCurrentTime" style="font-size: 0.7rem; color: var(--text-muted); font-family: 'Fira Code', monospace; min-width: 32px;">0:00</span>
-            <input type="range" id="playerProgressBar" min="0" max="100" value="0" step="any" style="flex: 1; accent-color: var(--neon-blue); height: 4px;">
-            <span id="playerTotalTime" style="font-size: 0.7rem; color: var(--text-muted); font-family: 'Fira Code', monospace; min-width: 32px;">0:00</span>
+        <!-- Progress bar row with volume toggle on the left -->
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.6rem;">
+            <button id="btnVolumeToggle" title="Volume" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 4px; display: flex; align-items: center; flex-shrink: 0;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+            </button>
+            <span id="playerCurrentTime" style="font-size: 0.72rem; color: var(--text-muted); font-family: 'Fira Code', monospace; min-width: 32px;">0:00</span>
+            <input type="range" id="playerProgressBar" min="0" max="100" value="0" step="any" style="flex: 1; accent-color: var(--neon-blue); height: 5px;">
+            <span id="playerTotalTime" style="font-size: 0.72rem; color: var(--text-muted); font-family: 'Fira Code', monospace; min-width: 32px;">0:00</span>
         </div>
     </div>
 

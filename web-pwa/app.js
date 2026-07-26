@@ -1564,10 +1564,11 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="mobile-card-subtitle" style="font-size: 0.75rem; color: var(--text-secondary);">${trackCount} tracks</div>
                     </div>
                 </div>
-                <div class="mpc-actions" style="display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0;" onclick="event.stopPropagation();">
-                    <button class="pa-play" title="Play" style="background: transparent; border: none; cursor: pointer; padding: 8px; font-size: 1.5rem;">▶️</button>
-                    <button class="pa-resume" title="Resume" style="background: transparent; border: none; cursor: pointer; padding: 8px; font-size: 1.5rem;">⏯️</button>
-                    <button class="pa-download" title="Download" style="background: transparent; border: none; cursor: pointer; padding: 8px; font-size: 1.5rem;">⬇️</button>
+                <div class="mpc-actions" style="display: flex; gap: 0.25rem; align-items: center; flex-shrink: 0;" onclick="event.stopPropagation();">
+                    <button class="pa-play" title="Play" style="background: transparent; border: none; cursor: pointer; padding: 6px; font-size: 1.4rem;">▶️</button>
+                    <button class="pa-shuffle" title="Shuffle play" style="background: transparent; border: none; cursor: pointer; padding: 6px; font-size: 1.4rem;">🔀</button>
+                    <button class="pa-resume" title="Resume" style="background: transparent; border: none; cursor: pointer; padding: 6px; font-size: 1.4rem;">⏯️</button>
+                    <button class="pa-download" title="Download" style="background: transparent; border: none; cursor: pointer; padding: 6px; font-size: 1.4rem;">⬇️</button>
                 </div>
             `;
             card.querySelector(".mpc-main").addEventListener("click", () => showMobilePlaylistTracks(pl));
@@ -1960,8 +1961,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (playerStatusText) playerStatusText.textContent = "Playing";
             updateMediaSession(track);
 
-            // Smart Caching: Pre-fetch next 3 tracks in background for zero-buffering / car playback
-            prefetchUpcomingTracks(playQueue, currentTrackIndex, 3);
+            // Smart Caching: proactively cache the next 5 tracks so screen-off /
+            // car playback plays from IndexedDB (no streaming, no stalls).
+            prefetchUpcomingTracks(playQueue, currentTrackIndex, 5);
         } catch (err) {
             console.error("Playback error:", err);
             if (playerStatusEq) playerStatusEq.classList.add("hidden");
@@ -1992,7 +1994,14 @@ document.addEventListener("DOMContentLoaded", () => {
             audioElement.pause();
             isPlaying = false;
         } else {
-            audioElement.play();
+            // If the previous playback errored/stalled (e.g. a backgrounded stream
+            // was interrupted), reload the current track rather than a dead resume.
+            const cur = playQueue[currentTrackIndex];
+            if (audioElement.error && cur) {
+                playTrack(cur, playQueue, currentTrackIndex);
+            } else {
+                audioElement.play().catch(() => { if (cur) playTrack(cur, playQueue, currentTrackIndex); });
+            }
             isPlaying = true;
         }
         updatePlayBtnUI();
@@ -2019,43 +2028,75 @@ document.addEventListener("DOMContentLoaded", () => {
         playTrack(playQueue[prevIdx], playQueue, prevIdx);
     }
 
-    // Lightweight background track advancement — keeps iOS audio session alive
-    // by building the media URL synchronously and calling play() with zero async gap.
-    // Falls back to full playTrack() only if a sync URL can't be constructed.
+    // Revoke previous blob object URL to avoid leaks across background advances.
+    let currentObjectUrl = null;
+    function setAudioBlobSrc(blob) {
+        if (currentObjectUrl) { try { URL.revokeObjectURL(currentObjectUrl); } catch (_) {} }
+        currentObjectUrl = URL.createObjectURL(blob);
+        audioElement.src = currentObjectUrl;
+    }
+
+    // Background track advancement (screen off / app backgrounded).
+    // IndexedDB-FIRST for reliability: a cached blob plays instantly from local
+    // storage (no network, no stall). If the track isn't cached we stream it
+    // directly from Azure — but WITHOUT a second concurrent fetch. (The previous
+    // version re-downloaded the whole file to auto-cache it WHILE the same file
+    // was streaming; the doubled bandwidth starved the audio buffer and stalled
+    // playback mid-song, and the stalled stream could not be resumed.) Caching is
+    // handled proactively by the foreground prefetch, and we top the cache up for
+    // the FOLLOWING tracks only when the current one is playing from cache (so we
+    // never contend with an in-flight stream).
     function playNextTrackBackground() {
         if (playQueue.length === 0) return;
         const nextIdx = (currentTrackIndex + 1) % playQueue.length;
         const nextTrack = playQueue[nextIdx];
         if (!nextTrack) return;
 
+        // Synchronous Azure fallback URL (zero async cost)
         const targetFile = nextTrack.file || (nextTrack.title ? `${nextTrack.title}.mp3` : null);
-        let mediaUrl = nextTrack.downloadUrl || null;
-
-        if (!mediaUrl && targetFile) {
+        let azureUrl = nextTrack.downloadUrl || null;
+        if (!azureUrl && targetFile) {
             const sasToken = getAzureSASToken();
-            if (sasToken) {
-                mediaUrl = `${getAzureBlobBaseUrl()}/${encodeURIComponent(targetFile)}?${sasToken}`;
-            }
-        }
-
-        if (!mediaUrl) {
-            playNextTrack();
-            return;
+            azureUrl = sasToken ? `${getAzureBlobBaseUrl()}/${encodeURIComponent(targetFile)}?${sasToken}` : null;
         }
 
         currentTrackIndex = nextIdx;
         isPlaying = true;
-        audioElement.src = mediaUrl;
-        audioElement.play().then(() => {
-            updatePlayBtnUI();
-            updateMediaSession(nextTrack);
-            if (playerTrackTitle) playerTrackTitle.textContent = nextTrack.title || "";
-            if (playerTrackArtist) playerTrackArtist.textContent = nextTrack.artist || nextTrack.uploader || "SonicStream";
-            const thumbUrl = getTrackThumbnailUrl(nextTrack);
-            if (playerTrackThumb) playerTrackThumb.src = thumbUrl;
-            if (activePlaylistId) saveResumePosition(activePlaylistId, nextTrack.id, 0, nextIdx);
-        }).catch(() => {
-            playTrack(nextTrack, playQueue, nextIdx);
+
+        // Race the IndexedDB read against a short timeout so the gapless
+        // transition never hangs. Cached blob -> instant local play; else stream.
+        const dbRead = getTrackRecordFromDB(nextTrack.id, nextTrack.title).catch(() => null);
+        const timeout = new Promise(r => setTimeout(() => r("timeout"), 700));
+
+        Promise.race([dbRead, timeout]).then(record => {
+            const cached = record && record !== "timeout" && record.blob;
+            if (cached) {
+                setAudioBlobSrc(record.blob);
+                console.log("[Audio Engine] Background: playing from IndexedDB cache");
+            } else if (azureUrl) {
+                audioElement.src = azureUrl;
+                console.log("[Audio Engine] Background: streaming from Azure (no double-download)");
+            } else {
+                playTrack(nextTrack, playQueue, nextIdx);
+                return;
+            }
+
+            audioElement.play().then(() => {
+                updatePlayBtnUI();
+                updateMediaSession(nextTrack);
+                if (playerTrackTitle) playerTrackTitle.textContent = nextTrack.title || "";
+                if (playerTrackArtist) playerTrackArtist.textContent = nextTrack.artist || nextTrack.uploader || "SonicStream";
+                const thumbUrl = getTrackThumbnailUrl(nextTrack);
+                if (playerTrackThumb) playerTrackThumb.src = thumbUrl;
+                if (activePlaylistId) saveResumePosition(activePlaylistId, nextTrack.id, 0, nextIdx);
+
+                // Keep the cache warm for upcoming tracks, but ONLY when the
+                // current track is playing from local cache (no in-flight stream
+                // to contend with) — this is what makes it durable without stalls.
+                if (cached) prefetchUpcomingTracks(playQueue, currentTrackIndex, 2);
+            }).catch(() => {
+                playTrack(nextTrack, playQueue, nextIdx);
+            });
         });
     }
 
@@ -2179,13 +2220,42 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    const volumePctEl = document.getElementById("volumePct");
     if (playerVolumeSlider) playerVolumeSlider.addEventListener("input", (e) => {
         const val = e.target.value / 100;
         audioElement.volume = Math.min(1.0, val);
+        // Desktop-only: extra gain via the Web Audio graph (up to ~180%).
         if (gainNode && audioCtx) {
             gainNode.gain.setValueAtTime(val * 1.8, audioCtx.currentTime);
         }
+        if (volumePctEl) volumePctEl.textContent = Math.round(e.target.value) + "%";
+        try { localStorage.setItem("sonicstream_volume", String(e.target.value)); } catch (_) {}
     });
+
+    // Volume toggle button (mobile): show/hide the slider popup.
+    const btnVolumeToggle = document.getElementById("btnVolumeToggle");
+    const volumePopup = document.getElementById("volumePopup");
+    if (btnVolumeToggle && volumePopup) {
+        btnVolumeToggle.addEventListener("click", (e) => {
+            e.stopPropagation();
+            volumePopup.style.display = volumePopup.style.display === "flex" ? "none" : "flex";
+        });
+        document.addEventListener("click", (e) => {
+            if (volumePopup.style.display === "flex" && !volumePopup.contains(e.target) && e.target !== btnVolumeToggle && !btnVolumeToggle.contains(e.target)) {
+                volumePopup.style.display = "none";
+            }
+        });
+    }
+
+    // Restore saved volume on load.
+    (function initVolume() {
+        let saved = 100;
+        try { const s = localStorage.getItem("sonicstream_volume"); if (s !== null) saved = parseInt(s); } catch (_) {}
+        if (isNaN(saved)) saved = 100;
+        if (playerVolumeSlider) playerVolumeSlider.value = saved;
+        if (audioElement) audioElement.volume = Math.min(1.0, saved / 100);
+        if (volumePctEl) volumePctEl.textContent = saved + "%";
+    })();
 
     function formatDuration(seconds) {
         if (!seconds) return "00:00";
@@ -2213,11 +2283,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 clearNextTrackTimers();
                 playNextTrack();
             });
-            navigator.mediaSession.setActionHandler("seekto", (details) => {
-                if (details.seekTime && audioElement.duration) {
-                    audioElement.currentTime = details.seekTime;
-                }
-            });
+            // Explicitly clear seek/scrub handlers: on iOS, registering seekto or
+            // seekbackward/seekforward replaces the lock-screen Next/Previous track
+            // buttons with a scrubber / 15s-skip. We want Next/Previous, so leave
+            // all seek handlers unset.
+            navigator.mediaSession.setActionHandler("seekto", null);
+            navigator.mediaSession.setActionHandler("seekbackward", null);
+            navigator.mediaSession.setActionHandler("seekforward", null);
+            navigator.mediaSession.playbackState = "playing";
         } catch (e) {
             console.warn("[MediaSession] AVRCP registration note:", e);
         }
