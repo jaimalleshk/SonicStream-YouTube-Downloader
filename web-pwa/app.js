@@ -1530,6 +1530,17 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Mobile home-card action buttons: 2x-size glyphs with a wide tap target,
+    // WITHOUT making the card row taller. The button box stays a fixed 46px (the
+    // thumbnail height) for a big tap area using the empty horizontal space; the
+    // glyph is doubled with transform:scale(2), which is layout-neutral (does not
+    // affect the row height), so scaling emoji can never grow the card. (Scaling
+    // font-size instead pushed the row taller because emoji line-boxes overflow.)
+    const MPC_ACTION_BTN_STYLE = "background: transparent; border: none; cursor: pointer; " +
+        "padding: 0; height: 46px; min-width: 64px; font-size: 1.4rem; line-height: 1; " +
+        "display: flex; align-items: center; justify-content: center; overflow: hidden;";
+    const mpcGlyph = (e) => `<span style="display:inline-block; transform:scale(2); transform-origin:center;">${e}</span>`;
+
     function renderMobilePlaylists() {
         if (!mobilePlaylistsList) return;
         mobilePlaylistsList.innerHTML = "";
@@ -1552,17 +1563,17 @@ document.addEventListener("DOMContentLoaded", () => {
             card.style.padding = "0.6rem 0.85rem";
             card.style.marginBottom = "0.5rem";
             card.innerHTML = `
-                <div class="mpc-main" style="display: flex; align-items: center; gap: 0.75rem; min-width: 0; flex: 1;">
+                <div class="mpc-main" style="display: flex; align-items: center; gap: 0.75rem; min-width: 0; flex: 1; height: 46px; overflow: hidden;">
                     <img src="${thumb}" class="mobile-card-thumb" style="width: 46px; height: 46px; border-radius: 8px; object-fit: cover; flex-shrink: 0;" onerror="this.onerror=null; this.src='gita_cover_logo.png'">
                     <div class="mobile-card-info" style="min-width: 0; flex: 1;">
                         <div class="mobile-card-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1.3rem; font-weight: 700; line-height: 1.2;">${pl.isPinned ? '📌 ' : ''}${pl.title || 'Untitled Playlist'}</div>
                         <div class="mobile-card-subtitle" style="font-size: 0.95rem; color: var(--text-secondary);">${trackCount} tracks</div>
                     </div>
                 </div>
-                <div class="mpc-actions" style="display: flex; gap: 0.25rem; align-items: center; flex-shrink: 0;" onclick="event.stopPropagation();">
-                    <button class="pa-play" title="Play" style="background: transparent; border: none; cursor: pointer; padding: 6px; font-size: 1.4rem;">▶️</button>
-                    <button class="pa-shuffle" title="Shuffle play" style="background: transparent; border: none; cursor: pointer; padding: 6px; font-size: 1.4rem;">🔀</button>
-                    <button class="pa-resume" title="Resume" style="background: transparent; border: none; cursor: pointer; padding: 6px; font-size: 1.4rem;">⏯️</button>
+                <div class="mpc-actions" style="display: flex; gap: 0.3rem; align-items: center; flex-shrink: 0;" onclick="event.stopPropagation();">
+                    <button class="pa-play" title="Play" style="${MPC_ACTION_BTN_STYLE}">${mpcGlyph('▶️')}</button>
+                    <button class="pa-shuffle" title="Shuffle play" style="${MPC_ACTION_BTN_STYLE}">${mpcGlyph('🔀')}</button>
+                    <button class="pa-resume" title="Resume" style="${MPC_ACTION_BTN_STYLE}">${mpcGlyph('⏯️')}</button>
                 </div>
             `;
             card.querySelector(".mpc-main").addEventListener("click", () => showMobilePlaylistTracks(pl));
