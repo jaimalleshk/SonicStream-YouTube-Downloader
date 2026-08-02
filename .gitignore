@@ -17,4 +17,9 @@ web-pwa/config.js
 web-pwa/media/
 sync_azure_batch.py
 
+# PyInstaller build output (the .exe is large; ship it via a release, not git)
+build/
+dist/
+*.manifest
+
 

@@ -20,10 +20,23 @@ import yt_dlp
 app = FastAPI(title="YouTube Downloader")
 
 # Setup directories
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DOWNLOAD_DIR = r"D:\OneDrive - Triamber\YoutubeDownloads"
+# When packaged as a PyInstaller .exe, read-only assets (static/, web-pwa/, the
+# bundled ffmpeg) live under sys._MEIPASS, while user data (history.json,
+# keys.json, downloads) must persist in a folder next to the .exe. In a normal
+# source run both are the repo folder, so dev behavior is unchanged.
+if getattr(sys, "frozen", False):
+    RESOURCE_DIR = sys._MEIPASS
+    BASE_DIR = os.path.dirname(sys.executable)
+    FFMPEG_DIR = RESOURCE_DIR if os.path.exists(os.path.join(RESOURCE_DIR, "ffmpeg.exe")) else None
+    DOWNLOAD_DIR = os.path.join(os.path.expanduser("~"), "Music", "SonicStream")
+else:
+    RESOURCE_DIR = os.path.dirname(os.path.abspath(__file__))
+    BASE_DIR = RESOURCE_DIR
+    FFMPEG_DIR = None
+    DOWNLOAD_DIR = r"D:\OneDrive - Triamber\YoutubeDownloads"
+
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
-STATIC_DIR = os.path.join(BASE_DIR, "static")
+STATIC_DIR = os.path.join(RESOURCE_DIR, "static")
 os.makedirs(STATIC_DIR, exist_ok=True)
 
 # History config
@@ -33,7 +46,7 @@ history_lock = threading.Lock()
 # Mount static files
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-PWA_DIR = os.path.join(BASE_DIR, "web-pwa")
+PWA_DIR = os.path.join(RESOURCE_DIR, "web-pwa")
 if os.path.exists(PWA_DIR):
     app.mount("/pwa", StaticFiles(directory=PWA_DIR, html=True), name="pwa")
 
@@ -194,7 +207,12 @@ def apply_bypass_ydl_opts(ydl_opts: dict) -> dict:
     cookies_browser = cfg.get("cookies_from_browser", "none")
     if cookies_browser and cookies_browser != "none":
         ydl_opts['cookiesfrombrowser'] = (cookies_browser,)
-        
+
+    # In the packaged .exe, ffmpeg/ffprobe are bundled next to the app instead of
+    # relying on the user's PATH (needed for MP3 extraction + thumbnail embedding).
+    if FFMPEG_DIR:
+        ydl_opts.setdefault('ffmpeg_location', FFMPEG_DIR)
+
     return ydl_opts
 
 # Helper: Sanitize windows filenames

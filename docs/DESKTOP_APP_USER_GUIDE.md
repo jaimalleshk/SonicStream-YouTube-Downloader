@@ -8,32 +8,46 @@ A friendly, step-by-step guide for everyday use. No technical knowledge needed.
 
 ---
 
-## 1. Getting the app (first time only — download from GitHub)
+## 1. Getting the app (first time only)
 
-You need a copy of the app on your PC. Two easy ways:
+You need a copy of the app on your PC. Pick whichever fits you.
 
-**Easiest — download the ZIP (no tools needed):**
-1. Open the project page: **https://github.com/jaimalleshk/SonicStream-YouTube-Downloader**
-2. Click the green **Code** button → **Download ZIP**.
-3. **Extract** the ZIP (right-click → *Extract All*) to a folder like `Documents\SonicStream`.
+### Option A — The ready-made app (easiest, nothing to install) ✅
 
-**Or — with Git (if you have it):**
-```bash
-git clone https://github.com/jaimalleshk/SonicStream-YouTube-Downloader.git
-```
+This is the packaged version: **no Python, no ffmpeg, no setup.** Just download,
+unzip, and run.
 
-**First-time setup (one time):** the app needs Python and a few components. If a
-`requirements.txt` and a setup/run script are included, run the setup step once
-(e.g. double-click the setup `.bat`, or in a terminal run
-`pip install -r requirements.txt`). After that, you launch it normally (next
-section). If you're not sure, ask whoever shared this with you for the exact
-first-run step for your PC.
+1. Get **`SonicStream.zip`** (from whoever shared the app with you, or from the
+   project's **Releases** page on GitHub).
+2. **Right-click the ZIP → Extract All** to a folder you like, e.g.
+   `Documents\SonicStream`.
+3. Open that folder and **double-click `SonicStream.exe`**.
+   - The first launch takes a few seconds while it starts up.
+   - Windows may show a blue *"Windows protected your PC"* box (because the app
+     isn't code-signed). Click **More info → Run anyway**. This is normal for
+     free, open-source apps.
+
+That's it — the app window opens. Your music downloads to your
+**`Music\SonicStream`** folder by default (you can change this later — see §3E).
+
+### Option B — Run from the source code (for tinkerers)
+
+1. Download the code: open
+   **https://github.com/jaimalleshk/SonicStream-YouTube-Downloader**, click the
+   green **Code** button → **Download ZIP**, and extract it. *(Or, with Git:
+   `git clone https://github.com/jaimalleshk/SonicStream-YouTube-Downloader.git`.)*
+2. Install **Python 3.11+** from https://python.org (tick *"Add Python to PATH"*).
+3. Install **ffmpeg** and make sure it's on your PATH (https://ffmpeg.org).
+4. In the project folder, run once: `pip install -r requirements.txt`
+5. Start it with `python gui.py` (or double-click `SonicStream.bat`).
+
+> Not sure which to pick? Choose **Option A**. It just works.
 
 ---
 
 ## 2. Opening the app
 
-Double-click **SonicStream** (the `SonicStream.bat` shortcut, or the app icon).
+Double-click **`SonicStream.exe`** (Option A) or run `python gui.py` (Option B).
 A window opens on your desktop — you don't need a web browser, and you don't
 need to sign in to anything.
 
@@ -44,7 +58,7 @@ You'll see:
 
 ---
 
-## 2. Downloading music from YouTube
+## 3. Downloading music from YouTube
 
 ### A) Download a whole playlist or a single song
 
@@ -92,7 +106,7 @@ You'll see:
 
 ---
 
-## 3. Playing your music in the app
+## 4. Playing your music in the app
 
 SonicStream isn't just a downloader — it's a player too.
 
@@ -107,7 +121,7 @@ SonicStream isn't just a downloader — it's a player too.
 
 ---
 
-## 4. Organizing playlists
+## 5. Organizing playlists
 
 - **Pin** playlists you use often so they stay at the top.
 - **Re-order** playlists with the up/down arrows.
@@ -117,7 +131,7 @@ SonicStream isn't just a downloader — it's a player too.
 
 ---
 
-## 5. Simple troubleshooting
+## 6. Simple troubleshooting
 
 | Problem | What to do |
 |---|---|
@@ -129,7 +143,7 @@ SonicStream isn't just a downloader — it's a player too.
 
 ---
 
-## 6. Frequently asked
+## 7. Frequently asked
 
 **Do I need an account or subscription?** No. It runs entirely on your PC.
 
@@ -143,3 +157,47 @@ computer, no connection needed.
 **How is this different from the phone/web player?** The **desktop app** is where you
 **download and play** on your PC. The separate **web/mobile player** streams the same
 library from the cloud on your phone — see the PWA guide for that.
+
+---
+
+## Appendix — Building the `.exe` (for maintainers only)
+
+End users never need this; it's how the ready-made `SonicStream.exe` in
+**Option A** is produced. The build bundles Python, all dependencies, and
+**ffmpeg/ffprobe** into one self-contained folder, so the person who runs it
+needs nothing installed.
+
+**One-time setup on the build machine:**
+```bash
+pip install -r requirements.txt
+pip install pyinstaller
+```
+
+**Build:**
+```bash
+build_exe.bat
+```
+(or, equivalently, `python -m PyInstaller sonicstream.spec --noconfirm`)
+
+- ffmpeg is pulled from the folder in the `FFMPEG_BIN` environment variable
+  (defaults to the original dev machine's path). If your ffmpeg lives elsewhere:
+  ```bash
+  set FFMPEG_BIN=C:\path\to\ffmpeg\bin
+  build_exe.bat
+  ```
+  That folder must contain both `ffmpeg.exe` and `ffprobe.exe`.
+- Output lands in **`dist\SonicStream\`**. The whole folder is the app; the
+  entry point is `dist\SonicStream\SonicStream.exe`.
+- **To share:** zip the entire `dist\SonicStream` folder as `SonicStream.zip`
+  and attach it to a GitHub Release (it's too large for the git repo, so
+  `build/` and `dist/` are git-ignored).
+- The build is **onedir** (a folder, not a single loose `.exe`) on purpose —
+  it starts faster and is far more reliable with pywebview + the bundled ffmpeg
+  than a one-file build.
+
+**Notes**
+- The packaged app stores its data (downloads default to `Music\SonicStream`,
+  plus `history.json` / `keys.json`) next to the `.exe`, not inside the
+  temporary unpack folder — so your library and history persist between runs.
+- The app isn't code-signed, so Windows SmartScreen shows a warning on first
+  run (**More info → Run anyway**). Code signing needs a paid certificate.
