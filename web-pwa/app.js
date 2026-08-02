@@ -1521,17 +1521,37 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Shared playlist action markup + wiring (used by desktop rows had their own;
-    // this drives the mobile cards and the mobile tracks-view toolbar).
-    const PA_BTN_STYLE = "background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); cursor: pointer; padding: 8px 0; font-size: 1.2rem; border-radius: 8px; flex: 1; display: inline-flex; align-items: center; justify-content: center;";
+    // Crisp SVG action controls, styled like the bottom player transport controls
+    // (subtle bg + border). Fixed 38px rounded squares so they take only the width
+    // they need and leave the playlist title its space. Shared by the mobile home
+    // cards and the selected-playlist (tracks) toolbar. (Emoji scaled with a
+    // transform looked low-res and ate the label — replaced with vector icons.)
+    const MPC_ACTION_BTN_STYLE = "width: 38px; height: 38px; border-radius: 9px; " +
+        "background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); " +
+        "color: var(--text-primary); cursor: pointer; padding: 0; flex-shrink: 0; " +
+        "display: flex; align-items: center; justify-content: center;";
+    // Accent the primary Play action.
+    const MPC_PLAY_BTN_STYLE = MPC_ACTION_BTN_STYLE + " border-color: var(--neon-blue); color: var(--neon-blue);";
+    const MPC_ICON = {
+        play: '<svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
+        shuffle: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>',
+        resume: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>',
+        download: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+        pin: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M9 10.76V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6.76a2 2 0 0 0 .59 1.42l1.41 1.41a1 1 0 0 1 .29.71V16a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-.7a1 1 0 0 1 .29-.71l1.41-1.41A2 2 0 0 0 9 10.76z"/></svg>',
+        delete: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>'
+    };
+
+    // Shared playlist action markup + wiring for the selected-playlist toolbar,
+    // reusing the same square controls with a per-action accent colour (later wins).
+    const PA_BTN_STYLE = MPC_ACTION_BTN_STYLE + " ";
     function playlistActionsHtml() {
         return `
-            <button class="pa-download" title="Download all to offline cache" style="${PA_BTN_STYLE} color: var(--neon-blue);">⬇️</button>
-            <button class="pa-play" title="Play" style="${PA_BTN_STYLE} color: var(--neon-blue);">▶️</button>
-            <button class="pa-resume" title="Resume from last position" style="${PA_BTN_STYLE} color: var(--neon-purple);">⏯️</button>
-            <button class="pa-shuffle" title="Shuffle play" style="${PA_BTN_STYLE} color: var(--text-secondary);">🔀</button>
-            <button class="pa-pin" title="Pin / unpin" style="${PA_BTN_STYLE} color: var(--text-muted);">📌</button>
-            <button class="pa-delete" title="Delete playlist" style="${PA_BTN_STYLE} color: #ff5f56;">🗑️</button>`;
+            <button class="pa-download" title="Download all to offline cache" style="${PA_BTN_STYLE} color: var(--neon-blue);">${MPC_ICON.download}</button>
+            <button class="pa-play" title="Play" style="${PA_BTN_STYLE} color: var(--neon-blue);">${MPC_ICON.play}</button>
+            <button class="pa-resume" title="Resume from last position" style="${PA_BTN_STYLE} color: var(--neon-purple);">${MPC_ICON.resume}</button>
+            <button class="pa-shuffle" title="Shuffle play" style="${PA_BTN_STYLE} color: var(--text-secondary);">${MPC_ICON.shuffle}</button>
+            <button class="pa-pin" title="Pin / unpin" style="${PA_BTN_STYLE} color: var(--text-muted);">${MPC_ICON.pin}</button>
+            <button class="pa-delete" title="Delete playlist" style="${PA_BTN_STYLE} color: #ff5f56;">${MPC_ICON.delete}</button>`;
     }
     function wirePlaylistActions(scope, pl) {
         const stop = fn => (e) => { e.stopPropagation(); fn(e); };
@@ -1542,7 +1562,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (pl.tracks) for (let i = 0; i < pl.tracks.length; i++) await prefetchUpcomingTracks([pl.tracks[i]], -1, 1);
                 b.textContent = "✅";
             } catch (_) { b.textContent = "⚠️"; }
-            setTimeout(() => { b.textContent = "⬇️"; }, 3000);
+            setTimeout(() => { b.innerHTML = MPC_ICON.download; }, 3000);
         });
         on(".pa-play", () => { selectPlaylist(pl); if (pl.tracks && pl.tracks.length) playTrack(pl.tracks[0], pl.tracks, 0); });
         on(".pa-resume", () => { selectPlaylist(pl); resumePlaylist(pl); });
@@ -1556,23 +1576,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
-
-    // Mobile home-card action buttons: crisp SVG icons in compact rounded squares,
-    // styled like the bottom player transport controls (subtle bg + border). Fixed
-    // 38px squares with a tight gap so they take only the width they need and leave
-    // the playlist title its space. (Emoji scaled with transform looked low-res and
-    // ate the label — replaced with vector icons.)
-    const MPC_ACTION_BTN_STYLE = "width: 38px; height: 38px; border-radius: 9px; " +
-        "background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); " +
-        "color: var(--text-primary); cursor: pointer; padding: 0; flex-shrink: 0; " +
-        "display: flex; align-items: center; justify-content: center;";
-    // Accent the primary Play action.
-    const MPC_PLAY_BTN_STYLE = MPC_ACTION_BTN_STYLE + " border-color: var(--neon-blue); color: var(--neon-blue);";
-    const MPC_ICON = {
-        play: '<svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
-        shuffle: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>',
-        resume: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>'
-    };
 
     function renderMobilePlaylists() {
         if (!mobilePlaylistsList) return;
@@ -1628,7 +1631,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!toolbar) {
             toolbar = document.createElement("div");
             toolbar.id = "mobileTracksToolbar";
-            toolbar.style.cssText = "display: flex; gap: 0.35rem; padding: 0 0.25rem 0.75rem; flex-wrap: wrap;";
+            toolbar.style.cssText = "display: flex; gap: 0.35rem; padding: 0 0.25rem 0.75rem; justify-content: space-between; flex-wrap: wrap;";
             if (mobileTrackList && mobileTrackList.parentNode) {
                 mobileTrackList.parentNode.insertBefore(toolbar, mobileTrackList);
             }
