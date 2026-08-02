@@ -635,7 +635,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (blob && blob.size > MAX_FILE_SIZE_BYTES) {
             const sizeMB = (blob.size / (1024 * 1024)).toFixed(1);
-            console.warn(`[Storage Guard] 🛑 Skipped saving large file exceeding 20MB: '${fileName}' (${sizeMB} MB)`);
+            const capMB = (MAX_FILE_SIZE_BYTES / (1024 * 1024)).toFixed(0);
+            console.warn(`[Storage Guard] 🛑 Skipped saving file over ${capMB}MB cap: '${fileName}' (${sizeMB} MB)`);
             return Promise.resolve();
         }
 
@@ -735,20 +736,46 @@ document.addEventListener("DOMContentLoaded", () => {
         return false;
     }
 
+    // Count how many track blobs are ACTUALLY cached in IndexedDB. This is the
+    // real signal of whether caching works — navigator.storage.estimate() is
+    // unreliable/rounded on iOS. Must count only rows that hold a real audio Blob:
+    // the "files" store also contains metadata-only rows (no blob) written by
+    // playlist-sync for the filename→blob join, so a plain .count() over-reports.
+    function countCachedTracks() {
+        return new Promise((resolve) => {
+            if (!db || !db.objectStoreNames.contains("files")) return resolve(0);
+            try {
+                let n = 0;
+                const req = db.transaction("files", "readonly").objectStore("files").openCursor();
+                req.onsuccess = (e) => {
+                    const cur = e.target.result;
+                    if (!cur) return resolve(n);
+                    const v = cur.value || {};
+                    const b = v.blob || v.audio_blob;
+                    if (b instanceof Blob && b.size > 0) n++;
+                    cur.continue();
+                };
+                req.onerror = () => resolve(n);
+            } catch (e) { resolve(0); }
+        });
+    }
+
     async function updateCacheUsageUI() {
-        if (!navigator.storage || !navigator.storage.estimate) {
-            if (cacheUsageText) cacheUsageText.textContent = "Offline cache ready";
-            return;
+        const cachedCount = await countCachedTracks();
+        let usageStr = "";
+        if (navigator.storage && navigator.storage.estimate) {
+            try {
+                const est = await navigator.storage.estimate();
+                const usedMB = ((est.usage || 0) / (1024 * 1024));
+                const quotaMB = ((est.quota || 0) / (1024 * 1024));
+                const fmt = (mb) => mb >= 1024 ? (mb / 1024).toFixed(2) + " GB" : mb.toFixed(1) + " MB";
+                usageStr = quotaMB > 0 ? ` · ${fmt(usedMB)} of ${fmt(quotaMB)}` : ` · ${fmt(usedMB)} used`;
+            } catch (e) {}
         }
-        try {
-            const est = await navigator.storage.estimate();
-            const usedMB = ((est.usage || 0) / (1024 * 1024)).toFixed(1);
-            const usedGB = ((est.usage || 0) / (1024 * 1024 * 1024)).toFixed(2);
-            if (cacheUsageText) {
-                cacheUsageText.textContent = `Used Storage: ${usedMB >= 1024 ? usedGB + ' GB' : usedMB + ' MB'} / 10 GB Max`;
-                cacheUsageText.style.color = (est.usage || 0) >= MAX_INDEXEDB_BYTES ? "#ff5f56" : "var(--neon-blue)";
-            }
-        } catch (e) {}
+        if (cacheUsageText) {
+            cacheUsageText.textContent = `${cachedCount} track${cachedCount === 1 ? '' : 's'} cached offline${usageStr}`;
+            cacheUsageText.style.color = cachedCount > 0 ? "var(--neon-blue)" : "var(--text-secondary)";
+        }
     }
 
     if (btnClearCache) {
@@ -1530,16 +1557,22 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Mobile home-card action buttons: 2x-size glyphs with a wide tap target,
-    // WITHOUT making the card row taller. The button box stays a fixed 46px (the
-    // thumbnail height) for a big tap area using the empty horizontal space; the
-    // glyph is doubled with transform:scale(2), which is layout-neutral (does not
-    // affect the row height), so scaling emoji can never grow the card. (Scaling
-    // font-size instead pushed the row taller because emoji line-boxes overflow.)
-    const MPC_ACTION_BTN_STYLE = "background: transparent; border: none; cursor: pointer; " +
-        "padding: 0; height: 46px; min-width: 64px; font-size: 1.4rem; line-height: 1; " +
-        "display: flex; align-items: center; justify-content: center; overflow: hidden;";
-    const mpcGlyph = (e) => `<span style="display:inline-block; transform:scale(2); transform-origin:center;">${e}</span>`;
+    // Mobile home-card action buttons: crisp SVG icons in compact rounded squares,
+    // styled like the bottom player transport controls (subtle bg + border). Fixed
+    // 38px squares with a tight gap so they take only the width they need and leave
+    // the playlist title its space. (Emoji scaled with transform looked low-res and
+    // ate the label — replaced with vector icons.)
+    const MPC_ACTION_BTN_STYLE = "width: 38px; height: 38px; border-radius: 9px; " +
+        "background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); " +
+        "color: var(--text-primary); cursor: pointer; padding: 0; flex-shrink: 0; " +
+        "display: flex; align-items: center; justify-content: center;";
+    // Accent the primary Play action.
+    const MPC_PLAY_BTN_STYLE = MPC_ACTION_BTN_STYLE + " border-color: var(--neon-blue); color: var(--neon-blue);";
+    const MPC_ICON = {
+        play: '<svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>',
+        shuffle: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>',
+        resume: '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>'
+    };
 
     function renderMobilePlaylists() {
         if (!mobilePlaylistsList) return;
@@ -1563,17 +1596,17 @@ document.addEventListener("DOMContentLoaded", () => {
             card.style.padding = "0.6rem 0.85rem";
             card.style.marginBottom = "0.5rem";
             card.innerHTML = `
-                <div class="mpc-main" style="display: flex; align-items: center; gap: 0.75rem; min-width: 0; flex: 1; height: 46px; overflow: hidden;">
+                <div class="mpc-main" style="display: flex; align-items: center; gap: 0.75rem; min-width: 0; flex: 1;">
                     <img src="${thumb}" class="mobile-card-thumb" style="width: 46px; height: 46px; border-radius: 8px; object-fit: cover; flex-shrink: 0;" onerror="this.onerror=null; this.src='gita_cover_logo.png'">
                     <div class="mobile-card-info" style="min-width: 0; flex: 1;">
                         <div class="mobile-card-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1.3rem; font-weight: 700; line-height: 1.2;">${pl.isPinned ? '📌 ' : ''}${pl.title || 'Untitled Playlist'}</div>
                         <div class="mobile-card-subtitle" style="font-size: 0.95rem; color: var(--text-secondary);">${trackCount} tracks</div>
                     </div>
                 </div>
-                <div class="mpc-actions" style="display: flex; gap: 0.3rem; align-items: center; flex-shrink: 0;" onclick="event.stopPropagation();">
-                    <button class="pa-play" title="Play" style="${MPC_ACTION_BTN_STYLE}">${mpcGlyph('▶️')}</button>
-                    <button class="pa-shuffle" title="Shuffle play" style="${MPC_ACTION_BTN_STYLE}">${mpcGlyph('🔀')}</button>
-                    <button class="pa-resume" title="Resume" style="${MPC_ACTION_BTN_STYLE}">${mpcGlyph('⏯️')}</button>
+                <div class="mpc-actions" style="display: flex; gap: 0.35rem; align-items: center; flex-shrink: 0;" onclick="event.stopPropagation();">
+                    <button class="pa-play" title="Play" style="${MPC_PLAY_BTN_STYLE}">${MPC_ICON.play}</button>
+                    <button class="pa-shuffle" title="Shuffle play" style="${MPC_ACTION_BTN_STYLE}">${MPC_ICON.shuffle}</button>
+                    <button class="pa-resume" title="Resume" style="${MPC_ACTION_BTN_STYLE}">${MPC_ICON.resume}</button>
                 </div>
             `;
             card.querySelector(".mpc-main").addEventListener("click", () => showMobilePlaylistTracks(pl));
@@ -1959,15 +1992,24 @@ document.addEventListener("DOMContentLoaded", () => {
                             if (playerStatusText) playerStatusText.textContent = "Downloading…";
                             setPlaybackSource("downloading");
                             const res = await fetch(azureUrl);
+                            // Decide by the REAL downloaded size, not the content-length
+                            // header: Azure often doesn't expose content-length on a
+                            // cross-origin fetch, so trusting the header skipped caching
+                            // entirely (storage stayed tiny). Only use the header as an
+                            // optimization to avoid downloading a KNOWN-huge file.
                             const len = parseInt((res && res.headers.get("content-length")) || "0", 10);
-                            if (res && res.ok && len > 0 && len <= MAX_FILE_SIZE_BYTES) {
+                            if (res && res.ok && !(len > MAX_FILE_SIZE_BYTES)) {
                                 const blob = await res.blob();
-                                await saveTrackBlobToDB(track.id, blob, track);
-                                mediaUrl = objectUrlFor(blob, "audio");
-                                fromCache = true; // now playing from the freshly-cached blob
-                                console.log("[PWA Player] Downloaded + cached, playing from blob: " + targetFile);
+                                if (blob.size <= MAX_FILE_SIZE_BYTES) {
+                                    await saveTrackBlobToDB(track.id, blob, track);
+                                    fromCache = true; // now playing from the freshly-cached blob
+                                    console.log("[PWA Player] Downloaded + cached (" + blob.size + " bytes): " + targetFile);
+                                } else {
+                                    console.log("[PWA Player] File over cap (" + blob.size + " bytes) — playing, not caching: " + targetFile);
+                                }
+                                mediaUrl = objectUrlFor(blob, "audio"); // play what we already downloaded
                             } else {
-                                console.log("[PWA Player] Large/unknown-size file — streaming live: " + targetFile + " (" + len + " bytes)");
+                                console.log("[PWA Player] Known-large file — streaming live: " + targetFile + " (" + len + " bytes)");
                             }
                         } catch (e) {
                             console.warn("[PWA Player] Download-then-play failed, streaming live:", e);
