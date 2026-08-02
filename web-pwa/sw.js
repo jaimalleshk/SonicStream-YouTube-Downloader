@@ -1,17 +1,34 @@
-const CACHE_NAME = "sonicstream-v2";
+const CACHE_NAME = "sonicstream-v3";
+// Precache the whole app shell so it LOADS OFFLINE. The pinned entry point is
+// mobile.html (index.html redirects to it), and it pulls in manifest_fallback.js
+// + config.js + settings.json — all of which must be cached or the offline
+// document fetch fails and nothing loads. addAll() is all-or-nothing, so keep
+// this list to files that always exist.
 const STATIC_ASSETS = [
   "./",
   "./index.html",
+  "./mobile.html",
+  "./desktop.html",
   "./style.css",
   "./app.js",
-  "./manifest.json"
+  "./config.js",
+  "./settings.json",
+  "./manifest.json",
+  "./manifest_fallback.js",
+  "./icon.svg",
+  "./favicon-mobile.svg",
+  "./favicon-desktop.svg"
 ];
 
 // Install Event - Cache Core Assets
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+      // Add each asset individually so a single missing/renamed file can't fail
+      // the whole precache (which would silently break offline loading).
+      return Promise.all(STATIC_ASSETS.map((url) =>
+        cache.add(url).catch((err) => console.warn("[SW] precache skip:", url, err))
+      ));
     }).then(() => self.skipWaiting())
   );
 });

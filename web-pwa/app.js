@@ -2140,35 +2140,26 @@ document.addEventListener("DOMContentLoaded", () => {
         currentTrackIndex = nextIdx;
         isPlaying = true;
 
-        const applyMeta = (isStream) => {
-            updatePlayBtnUI();
-            updateMediaSession(nextTrack);
-            setPlaybackSource(isStream ? "stream" : "cache");
-            lastPlaybackWasStream = isStream;
-            if (playerTrackTitle) playerTrackTitle.textContent = nextTrack.title || "";
-            if (playerTrackArtist) playerTrackArtist.textContent = nextTrack.artist || nextTrack.uploader || "SonicStream";
-            if (playerTrackThumb) playerTrackThumb.src = getTrackThumbnailUrl(nextTrack);
-            if (activePlaylistId) saveResumePosition(activePlaylistId, nextTrack.id, 0, nextIdx);
-        };
+        // CRITICAL (iOS background): advance with ZERO async gap. Any await before
+        // play() — an IndexedDB read, or a setTimeout race — lets iOS suspend the
+        // audio session between tracks in the background, which is exactly what
+        // stopped playback after a few songs with the screen off (it only "resumed
+        // on app open" because foregrounding un-throttled the pending timer). Per
+        // the app's design, background auto-advance STREAMS directly from Azure
+        // (reliable); cached/offline playback is a foreground path via playTrack().
+        if (!azureUrl) { playTrack(nextTrack, playQueue, nextIdx); return; }
+        audioElement.src = azureUrl;
+        const p = audioElement.play();
+        if (p && p.catch) p.catch(() => playTrack(nextTrack, playQueue, nextIdx));
 
-        // Prefer a cached blob (reliable, no network — this is what makes screen-off
-        // playback continue). If not cached, stream live. NO background download
-        // (iOS throttles it and it stalls). Race a short timeout so the gapless
-        // transition never hangs on a slow DB read.
-        const dbRead = getTrackRecordFromDB(nextTrack.id, nextTrack.title).catch(() => null);
-        const timeout = new Promise(r => setTimeout(() => r("timeout"), 500));
-        Promise.race([dbRead, timeout]).then(record => {
-            const cached = record && record !== "timeout" && record.blob;
-            if (cached) {
-                audioElement.src = objectUrlFor(record.blob, "audio");
-                audioElement.play().then(() => applyMeta(false)).catch(() => playTrack(nextTrack, playQueue, nextIdx));
-            } else if (azureUrl) {
-                audioElement.src = azureUrl;
-                audioElement.play().then(() => applyMeta(true)).catch(() => playTrack(nextTrack, playQueue, nextIdx));
-            } else {
-                playTrack(nextTrack, playQueue, nextIdx);
-            }
-        });
+        updatePlayBtnUI();
+        updateMediaSession(nextTrack);
+        setPlaybackSource("stream");
+        lastPlaybackWasStream = true;
+        if (playerTrackTitle) playerTrackTitle.textContent = nextTrack.title || "";
+        if (playerTrackArtist) playerTrackArtist.textContent = nextTrack.artist || nextTrack.uploader || "SonicStream";
+        if (playerTrackThumb) playerTrackThumb.src = getTrackThumbnailUrl(nextTrack);
+        if (activePlaylistId) saveResumePosition(activePlaylistId, nextTrack.id, 0, nextIdx);
     }
 
     // Referenced by audio error handlers but was never defined — prevents ReferenceError
@@ -2344,7 +2335,22 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             navigator.mediaSession.setActionHandler("play", () => {
                 if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
-                if (audioElement.src) { audioElement.play().catch(()=>{}); isPlaying = true; updatePlayBtnUI(); }
+                const cur = playQueue[currentTrackIndex];
+                // A paused/backgrounded STREAM goes stale (iOS drops the network
+                // connection), and a dead resume makes the car/lock-screen Play
+                // button do nothing. If the element errored or lost its src, reload
+                // the current track instead of a no-op play() — same recovery the
+                // in-app Play button uses.
+                if ((audioElement.error || !audioElement.src) && cur) {
+                    playTrack(cur, playQueue, currentTrackIndex);
+                    isPlaying = true; updatePlayBtnUI();
+                    return;
+                }
+                if (audioElement.src) {
+                    audioElement.play()
+                        .then(() => { isPlaying = true; updatePlayBtnUI(); })
+                        .catch(() => { if (cur) playTrack(cur, playQueue, currentTrackIndex); });
+                }
             });
             navigator.mediaSession.setActionHandler("pause", () => {
                 if (audioElement.src) { audioElement.pause(); isPlaying = false; updatePlayBtnUI(); }
