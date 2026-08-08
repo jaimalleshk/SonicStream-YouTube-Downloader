@@ -2167,18 +2167,16 @@ document.addEventListener("DOMContentLoaded", () => {
         clearNextTrackTimers();
         if (isPlaying) {
             userInitiatedPause = true;   // not an interruption — don't auto-resume
-            audioElement.pause();
-            isPlaying = false;
+            audioElement.pause();        // "pause" event syncs isPlaying + the UI
         } else {
-            // If the previous playback errored/stalled (e.g. a backgrounded stream
-            // was interrupted), reload the current track rather than a dead resume.
-            const cur = playQueue[currentTrackIndex];
-            if (audioElement.error && cur) {
-                playTrack(cur, playQueue, currentTrackIndex);
-            } else {
-                audioElement.play().catch(() => { if (cur) playTrack(cur, playQueue, currentTrackIndex); });
-            }
-            isPlaying = true;
+            // Use the SAME recovery ladder as the lock-screen/car Play button: a
+            // resume can fail outright OR resolve while producing no audio, and
+            // both need escalation. Don't set isPlaying optimistically — the
+            // element's "play" event is the source of truth, so the icon can't
+            // claim we're playing while it's silent.
+            userInitiatedPause = false;
+            resumeAfterInterruption = false;
+            resumePlaybackWithRecovery();
         }
         updatePlayBtnUI();
     });
@@ -2577,11 +2575,23 @@ document.addEventListener("DOMContentLoaded", () => {
         const cur = playQueue[currentTrackIndex];
         const fullReload = () => { if (cur) playTrack(cur, playQueue, currentTrackIndex); };
 
-        if (audioElement.error || !audioElement.src) { fullReload(); return; }
+        // CRITICAL: on iOS, resuming from the lock screen can RESOLVE play() and
+        // still produce no sound — the icon flips, the app and lock screen agree
+        // they're "playing", but the playback clock never moves. A .catch() alone
+        // therefore never fires and no recovery runs. So verify real progress and
+        // escalate if the clock is stuck.
+        const verifyProgress = (escalate) => {
+            const t0 = audioElement.currentTime;
+            setTimeout(() => {
+                const stuck = audioElement.paused || (audioElement.currentTime - t0) < 0.05;
+                if (stuck) {
+                    console.warn("[Audio] Resume produced no progress — escalating recovery.");
+                    escalate();
+                }
+            }, 800);
+        };
 
-        const p = audioElement.play();
-        if (!p || !p.then) return;                 // old browsers: no promise, assume ok
-        p.catch(() => {
+        const reloadSeekPlay = () => {
             try {
                 const pos = audioElement.currentTime || 0;
                 audioElement.load();               // re-open the same source
@@ -2591,11 +2601,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 };
                 audioElement.addEventListener("loadedmetadata", seekBack);
                 const p2 = audioElement.play();
-                if (p2 && p2.catch) p2.catch(fullReload);
+                if (p2 && p2.then) p2.then(() => verifyProgress(fullReload)).catch(fullReload);
+                else verifyProgress(fullReload);
             } catch (_) {
                 fullReload();
             }
-        });
+        };
+
+        if (audioElement.error || !audioElement.src) { fullReload(); return; }
+
+        const p = audioElement.play();
+        if (!p || !p.then) { verifyProgress(reloadSeekPlay); return; }
+        p.then(() => verifyProgress(reloadSeekPlay)).catch(reloadSeekPlay);
     }
 
     function initInterruptionRecovery() {
