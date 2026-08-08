@@ -510,9 +510,26 @@ document.addEventListener("DOMContentLoaded", () => {
                 const tx = db.transaction("files", "readwrite");
                 const store = tx.objectStore("files");
                 fileRecords.forEach(rec => {
-                    if (rec && rec.file_id) {
-                        store.put(rec);
-                    }
+                    if (!rec || !rec.file_id) return;
+                    // MERGE — never blind-put. These are metadata-only records from
+                    // playlist sync (no blob). IndexedDB put() REPLACES the whole
+                    // record, so a blind put wiped the cached audio Blob for every
+                    // synced track — i.e. every "Refresh" destroyed the entire
+                    // offline cache, which is why nothing ever stayed cached.
+                    const getReq = store.get(rec.file_id);
+                    getReq.onsuccess = () => {
+                        const existing = getReq.result;
+                        const merged = Object.assign({}, existing || {}, rec);
+                        // Belt-and-braces: explicitly carry over any cached binaries.
+                        if (existing) {
+                            if (existing.blob) merged.blob = existing.blob;
+                            if (existing.audio_blob) merged.audio_blob = existing.audio_blob;
+                            if (existing.thumb_blob) merged.thumb_blob = existing.thumb_blob;
+                            if (existing.thumbBlob) merged.thumbBlob = existing.thumbBlob;
+                        }
+                        store.put(merged);
+                    };
+                    getReq.onerror = () => { store.put(rec); };
                 });
                 tx.oncomplete = () => resolve();
                 tx.onerror = () => resolve();
@@ -536,10 +553,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function getSettingFromDB(key) {
-        if (!db || !db.objectStoreNames.contains("settings")) return Promise.resolve(null);
+        // TDZ-safe: populateSettingsUI() runs at startup BEFORE `let db` is
+        // initialized, so touching `db` here threw a ReferenceError that aborted
+        // the settings load (leaving the saved SAS token unpopulated until a
+        // later re-run). Read it inside a try and resolve null until the DB exists.
+        let database = null;
+        try { database = db; } catch (_) { return Promise.resolve(null); }
+        if (!database || !database.objectStoreNames.contains("settings")) return Promise.resolve(null);
         return new Promise((resolve) => {
             try {
-                const tx = db.transaction("settings", "readonly");
+                const tx = database.transaction("settings", "readonly");
                 const req = tx.objectStore("settings").get(key);
                 req.onsuccess = () => resolve(req.result ? req.result.value : null);
                 req.onerror = () => resolve(null);
@@ -743,10 +766,16 @@ document.addEventListener("DOMContentLoaded", () => {
     // playlist-sync for the filename→blob join, so a plain .count() over-reports.
     function countCachedTracks() {
         return new Promise((resolve) => {
-            if (!db || !db.objectStoreNames.contains("files")) return resolve(0);
+            // TDZ-safe: updateCacheUsageUI() runs during early settings population,
+            // BEFORE `let db` is initialized. Touching `db` there throws a
+            // ReferenceError (and `typeof` throws too in a temporal dead zone), so
+            // read it inside a try and bail out quietly until the DB exists.
+            let database = null;
+            try { database = db; } catch (_) { return resolve(0); }
+            if (!database || !database.objectStoreNames.contains("files")) return resolve(0);
             try {
                 let n = 0;
-                const req = db.transaction("files", "readonly").objectStore("files").openCursor();
+                const req = database.transaction("files", "readonly").objectStore("files").openCursor();
                 req.onsuccess = (e) => {
                     const cur = e.target.result;
                     if (!cur) return resolve(n);
@@ -2107,6 +2136,9 @@ document.addEventListener("DOMContentLoaded", () => {
             // Smart Caching: proactively cache the next 5 tracks so screen-off /
             // car playback plays from IndexedDB (no streaming, no stalls).
             prefetchUpcomingTracks(playQueue, currentTrackIndex, 5);
+            // Pre-resolve the next track's cached blob URL NOW, while we're in the
+            // foreground, so the background advance needs no async work at all.
+            prepareNextTrackUrl();
         } catch (err) {
             console.error("Playback error:", err);
             if (playerStatusEq) playerStatusEq.classList.add("hidden");
@@ -2134,6 +2166,7 @@ document.addEventListener("DOMContentLoaded", () => {
         initWebAudioEngine();
         clearNextTrackTimers();
         if (isPlaying) {
+            userInitiatedPause = true;   // not an interruption — don't auto-resume
             audioElement.pause();
             isPlaying = false;
         } else {
@@ -2171,6 +2204,33 @@ document.addEventListener("DOMContentLoaded", () => {
         playTrack(playQueue[prevIdx], playQueue, prevIdx);
     }
 
+    // Pre-resolved object URL for the NEXT track, built while the current track is
+    // still playing. This is what lets the background advance play from cache with
+    // no async work in the `ended` handler (an await there suspends the iOS audio
+    // session). Shape: { trackId, url }.
+    let preparedNextUrl = null;
+
+    async function prepareNextTrackUrl() {
+        try {
+            if (playQueue.length === 0) return;
+            const nextIdx = (currentTrackIndex + 1) % playQueue.length;
+            const nextTrack = playQueue[nextIdx];
+            if (!nextTrack) return;
+            if (preparedNextUrl && preparedNextUrl.trackId === nextTrack.id) return; // already ready
+            // Drop a stale preparation.
+            if (preparedNextUrl) {
+                try { URL.revokeObjectURL(preparedNextUrl.url); } catch (_) {}
+                preparedNextUrl = null;
+            }
+            const rec = await getTrackRecordFromDB(nextTrack.id, nextTrack.title);
+            const blob = rec && (rec.blob || rec.audio_blob);
+            if (blob instanceof Blob && blob.size > 0) {
+                preparedNextUrl = { trackId: nextTrack.id, url: URL.createObjectURL(blob) };
+                console.log("[Audio] Next track ready from cache: " + (nextTrack.title || ""));
+            }
+        } catch (e) { /* non-fatal: we'll just stream */ }
+    }
+
     // Revoke previous blob object URL to avoid leaks across background advances.
     // Background track advancement (screen off / app backgrounded).
     // STABLE, MINIMAL version (reverted): build the media URL SYNCHRONOUSLY and
@@ -2196,6 +2256,33 @@ document.addEventListener("DOMContentLoaded", () => {
         currentTrackIndex = nextIdx;
         isPlaying = true;
 
+        // Use a blob URL prepared EARLIER (while the previous track was still
+        // playing) if we have one for this track. This gives cached, network-free
+        // background playback while still calling play() synchronously — the two
+        // requirements that previously conflicted. Streaming every track is what
+        // made background playback die after 2-3 songs.
+        if (preparedNextUrl && preparedNextUrl.trackId === nextTrack.id) {
+            const url = preparedNextUrl.url;
+            preparedNextUrl = null;          // consumed; don't revoke (now in use)
+            if (currentAudioObjectUrl && currentAudioObjectUrl !== url) {
+                try { URL.revokeObjectURL(currentAudioObjectUrl); } catch (_) {}
+            }
+            currentAudioObjectUrl = url;
+            audioElement.src = url;
+            const pc = audioElement.play();
+            if (pc && pc.catch) pc.catch(() => playTrack(nextTrack, playQueue, nextIdx));
+            updatePlayBtnUI();
+            updateMediaSession(nextTrack);
+            setPlaybackSource("cache");
+            lastPlaybackWasStream = false;
+            if (playerTrackTitle) playerTrackTitle.textContent = nextTrack.title || "";
+            if (playerTrackArtist) playerTrackArtist.textContent = nextTrack.artist || nextTrack.uploader || "SonicStream";
+            if (playerTrackThumb) playerTrackThumb.src = getTrackThumbnailUrl(nextTrack);
+            if (activePlaylistId) saveResumePosition(activePlaylistId, nextTrack.id, 0, nextIdx);
+            prepareNextTrackUrl();           // queue up the one after this
+            return;
+        }
+
         // CRITICAL (iOS background): advance with ZERO async gap. Any await before
         // play() — an IndexedDB read, or a setTimeout race — lets iOS suspend the
         // audio session between tracks in the background, which is exactly what
@@ -2216,6 +2303,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (playerTrackArtist) playerTrackArtist.textContent = nextTrack.artist || nextTrack.uploader || "SonicStream";
         if (playerTrackThumb) playerTrackThumb.src = getTrackThumbnailUrl(nextTrack);
         if (activePlaylistId) saveResumePosition(activePlaylistId, nextTrack.id, 0, nextIdx);
+        prepareNextTrackUrl();   // so the FOLLOWING advance can come from cache
     }
 
     // Referenced by audio error handlers but was never defined — prevents ReferenceError
@@ -2389,28 +2477,18 @@ document.addEventListener("DOMContentLoaded", () => {
     function initMediaSessionHandlers() {
         if (!("mediaSession" in navigator)) return;
         try {
-            navigator.mediaSession.setActionHandler("play", () => {
-                if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
-                const cur = playQueue[currentTrackIndex];
-                // A paused/backgrounded STREAM goes stale (iOS drops the network
-                // connection), and a dead resume makes the car/lock-screen Play
-                // button do nothing. If the element errored or lost its src, reload
-                // the current track instead of a no-op play() — same recovery the
-                // in-app Play button uses.
-                if ((audioElement.error || !audioElement.src) && cur) {
-                    playTrack(cur, playQueue, currentTrackIndex);
-                    isPlaying = true; updatePlayBtnUI();
-                    return;
-                }
-                if (audioElement.src) {
-                    audioElement.play()
-                        .then(() => { isPlaying = true; updatePlayBtnUI(); })
-                        .catch(() => { if (cur) playTrack(cur, playQueue, currentTrackIndex); });
-                }
-            });
-            navigator.mediaSession.setActionHandler("pause", () => {
-                if (audioElement.src) { audioElement.pause(); isPlaying = false; updatePlayBtnUI(); }
-            });
+            // DO NOT register custom "play" / "pause" handlers.
+            //
+            // Registering them hands play/pause control to OUR JavaScript. iOS
+            // freezes a backgrounded/locked PWA's JS while the native audio keeps
+            // playing — so the lock-screen and car-Bluetooth Play/Pause buttons did
+            // nothing unless the app was open in the foreground. Leaving them unset
+            // makes WebKit drive the <audio> element NATIVELY, which works even
+            // while our JS is frozen. Next/Previous still need JS (no native
+            // equivalent), so those stay registered.
+            // UI state is kept in sync by the element's own play/pause events.
+            navigator.mediaSession.setActionHandler("play", null);
+            navigator.mediaSession.setActionHandler("pause", null);
             navigator.mediaSession.setActionHandler("previoustrack", () => {
                 clearNextTrackTimers();
                 playPrevTrack();
@@ -2426,10 +2504,82 @@ document.addEventListener("DOMContentLoaded", () => {
             navigator.mediaSession.setActionHandler("seekto", null);
             navigator.mediaSession.setActionHandler("seekbackward", null);
             navigator.mediaSession.setActionHandler("seekforward", null);
-            navigator.mediaSession.playbackState = "playing";
+            // Reflect reality: nothing is playing at startup. Hardcoding "playing"
+            // desynced the lock screen from the element.
+            navigator.mediaSession.playbackState = audioElement && !audioElement.paused ? "playing" : "none";
         } catch (e) {
             console.warn("[MediaSession] AVRCP registration note:", e);
         }
+    }
+
+    // --- Audio interruption handling (phone calls, texts, other apps) ---
+    // iOS pauses our <audio> when a call/alert takes the audio session, and does
+    // NOT resume it afterwards. Declaring the session type as "playback" lets iOS
+    // duck/interrupt correctly, and we auto-resume once the interruption ends.
+    let userInitiatedPause = false;   // set by our own Play/Pause UI
+    let resumeAfterInterruption = false;
+    let interruptionRetryTimer = null;
+
+    function initAudioSession() {
+        try {
+            // Safari 16.4+ / iOS 17+. "playback" = long-form media: the OS ducks
+            // for notifications and restores the session after a call.
+            if (navigator.audioSession) navigator.audioSession.type = "playback";
+        } catch (e) { /* not supported — harmless */ }
+    }
+
+    function tryResumeAfterInterruption(reason) {
+        if (!resumeAfterInterruption || !audioElement || !audioElement.src) return;
+        if (!audioElement.paused) { resumeAfterInterruption = false; return; }
+        const p = audioElement.play();
+        if (p && p.then) {
+            p.then(() => {
+                resumeAfterInterruption = false;
+                console.log("[Audio] Resumed after interruption (" + reason + ")");
+            }).catch(() => { /* still interrupted; a later event will retry */ });
+        }
+    }
+
+    function initInterruptionRecovery() {
+        if (!audioElement) return;
+
+        // Keep UI + lock screen in sync no matter WHO paused/played (native
+        // lock-screen/car controls now drive the element directly).
+        audioElement.addEventListener("play", () => {
+            isPlaying = true;
+            userInitiatedPause = false;
+            resumeAfterInterruption = false;
+            updatePlayBtnUI();
+        });
+
+        audioElement.addEventListener("pause", () => {
+            isPlaying = false;
+            updatePlayBtnUI();
+            // A pause we did NOT initiate, on a track that hasn't ended, is an
+            // interruption (incoming call, message, another app grabbing audio).
+            if (!userInitiatedPause && !audioElement.ended) {
+                resumeAfterInterruption = true;
+                clearTimeout(interruptionRetryTimer);
+                // Retry a few times: the OS releases the session shortly after the
+                // call/alert finishes. (Timers are throttled in the background, so
+                // the visibility/focus listeners below are the reliable path.)
+                let attempts = 0;
+                const retry = () => {
+                    if (!resumeAfterInterruption || attempts++ > 6) return;
+                    tryResumeAfterInterruption("retry " + attempts);
+                    interruptionRetryTimer = setTimeout(retry, 2000);
+                };
+                interruptionRetryTimer = setTimeout(retry, 1500);
+            }
+        });
+
+        // The moment the app/screen comes back, or the page regains focus, is the
+        // most reliable point to recover a session lost to an interruption.
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) tryResumeAfterInterruption("visibility");
+        });
+        window.addEventListener("focus", () => tryResumeAfterInterruption("focus"));
+        window.addEventListener("pageshow", () => tryResumeAfterInterruption("pageshow"));
     }
 
     function updateMediaSession(track) {
@@ -2513,7 +2663,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // --- Settings Modal ---
-    if (btnOpenSettings) btnOpenSettings.addEventListener("click", () => settingsModal && settingsModal.classList.remove("hidden"));
+    if (btnOpenSettings) btnOpenSettings.addEventListener("click", () => {
+        if (settingsModal) settingsModal.classList.remove("hidden");
+        // Recompute on open — the figure was only calculated at page load, so it
+        // showed a stale value (e.g. "0 tracks") after caching tracks in a session.
+        updateCacheUsageUI();
+    });
     if (btnCloseSettings) btnCloseSettings.addEventListener("click", () => settingsModal && settingsModal.classList.add("hidden"));
     if (btnSaveSettings) {
         btnSaveSettings.addEventListener("click", () => {
@@ -2685,5 +2840,7 @@ document.addEventListener("DOMContentLoaded", () => {
         await loadPlaylistsFromDB();
     });
     initMSAL();
+    initAudioSession();
+    initInterruptionRecovery();
     initMediaSessionHandlers();
 });
