@@ -2477,18 +2477,34 @@ document.addEventListener("DOMContentLoaded", () => {
     function initMediaSessionHandlers() {
         if (!("mediaSession" in navigator)) return;
         try {
-            // DO NOT register custom "play" / "pause" handlers.
+            // Play/Pause handlers must exist AND be minimal + synchronous.
             //
-            // Registering them hands play/pause control to OUR JavaScript. iOS
-            // freezes a backgrounded/locked PWA's JS while the native audio keeps
-            // playing — so the lock-screen and car-Bluetooth Play/Pause buttons did
-            // nothing unless the app was open in the foreground. Leaving them unset
-            // makes WebKit drive the <audio> element NATIVELY, which works even
-            // while our JS is frozen. Next/Previous still need JS (no native
-            // equivalent), so those stay registered.
-            // UI state is kept in sync by the element's own play/pause events.
-            navigator.mediaSession.setActionHandler("play", null);
-            navigator.mediaSession.setActionHandler("pause", null);
+            // They must EXIST because a remote pause is the only way to know the
+            // user deliberately paused: without them, the interruption auto-resume
+            // below could not tell a car/lock-screen Pause from a phone call and
+            // restarted playback ~1.5s later (i.e. "Pause does nothing").
+            //
+            // They must be MINIMAL because the earlier versions called playTrack()
+            // — an async fetch/IndexedDB path — which cannot complete when iOS
+            // throttles a backgrounded PWA, so the buttons appeared dead. Just
+            // drive the element directly and set playbackState.
+            navigator.mediaSession.setActionHandler("play", () => {
+                userInitiatedPause = false;
+                resumeAfterInterruption = false;
+                const p = audioElement.play();
+                if (p && p.catch) p.catch(() => {});
+                isPlaying = true;
+                try { navigator.mediaSession.playbackState = "playing"; } catch (_) {}
+            });
+            navigator.mediaSession.setActionHandler("pause", () => {
+                // A remote pause is DELIBERATE — never auto-resume it.
+                userInitiatedPause = true;
+                resumeAfterInterruption = false;
+                clearTimeout(interruptionRetryTimer);
+                audioElement.pause();
+                isPlaying = false;
+                try { navigator.mediaSession.playbackState = "paused"; } catch (_) {}
+            });
             navigator.mediaSession.setActionHandler("previoustrack", () => {
                 clearNextTrackTimers();
                 playPrevTrack();
@@ -2560,14 +2576,19 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!userInitiatedPause && !audioElement.ended) {
                 resumeAfterInterruption = true;
                 clearTimeout(interruptionRetryTimer);
-                // Retry a few times: the OS releases the session shortly after the
-                // call/alert finishes. (Timers are throttled in the background, so
-                // the visibility/focus listeners below are the reliable path.)
+                // Keep trying for several minutes with backoff: a phone call can
+                // last far longer than a few seconds, and play() simply gets
+                // rejected while the call still holds the audio session (so this
+                // can never un-mute us mid-call — it only succeeds once the OS
+                // hands the session back). Timers are throttled in the background,
+                // so the visibility/focus listeners below are the backup path.
                 let attempts = 0;
                 const retry = () => {
-                    if (!resumeAfterInterruption || attempts++ > 6) return;
+                    if (!resumeAfterInterruption || attempts > 40) return;
+                    attempts++;
                     tryResumeAfterInterruption("retry " + attempts);
-                    interruptionRetryTimer = setTimeout(retry, 2000);
+                    const delay = attempts < 8 ? 2000 : (attempts < 20 ? 5000 : 15000);
+                    interruptionRetryTimer = setTimeout(retry, delay);
                 };
                 interruptionRetryTimer = setTimeout(retry, 1500);
             }
