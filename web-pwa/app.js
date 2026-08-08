@@ -2491,19 +2491,18 @@ document.addEventListener("DOMContentLoaded", () => {
             navigator.mediaSession.setActionHandler("play", () => {
                 userInitiatedPause = false;
                 resumeAfterInterruption = false;
-                const p = audioElement.play();
-                if (p && p.catch) p.catch(() => {});
-                isPlaying = true;
-                try { navigator.mediaSession.playbackState = "playing"; } catch (_) {}
+                // NOTE: do NOT optimistically set playbackState/isPlaying here. Doing
+                // that flipped the car's Play icon even when play() failed, so the
+                // head unit showed "playing" in silence. The element's own "play"
+                // event is the source of truth and updates the UI on real success.
+                resumePlaybackWithRecovery();
             });
             navigator.mediaSession.setActionHandler("pause", () => {
                 // A remote pause is DELIBERATE — never auto-resume it.
                 userInitiatedPause = true;
                 resumeAfterInterruption = false;
                 clearTimeout(interruptionRetryTimer);
-                audioElement.pause();
-                isPlaying = false;
-                try { navigator.mediaSession.playbackState = "paused"; } catch (_) {}
+                audioElement.pause();   // "pause" event syncs isPlaying + playbackState
             });
             navigator.mediaSession.setActionHandler("previoustrack", () => {
                 clearNextTrackTimers();
@@ -2547,6 +2546,13 @@ document.addEventListener("DOMContentLoaded", () => {
     function tryResumeAfterInterruption(reason) {
         if (!resumeAfterInterruption || !audioElement || !audioElement.src) return;
         if (!audioElement.paused) { resumeAfterInterruption = false; return; }
+        // A long call can leave the media itself broken, not just the session —
+        // a plain play() would then fail forever. Use the recovery ladder.
+        if (audioElement.error) {
+            resumeAfterInterruption = false;
+            resumePlaybackWithRecovery();
+            return;
+        }
         const p = audioElement.play();
         if (p && p.then) {
             p.then(() => {
@@ -2554,6 +2560,42 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.log("[Audio] Resumed after interruption (" + reason + ")");
             }).catch(() => { /* still interrupted; a later event will retry */ });
         }
+    }
+
+    // Resume playback for a REMOTE play command (car Bluetooth / lock screen).
+    //
+    // A plain play() is not enough: after being paused in the background, a
+    // streamed Azure source has usually dropped its connection, so play() rejects
+    // immediately. The old code swallowed that rejection, which is why the car's
+    // Play button changed the icon but never produced sound. Escalate instead:
+    //   1. element already broken  -> full reload via playTrack()
+    //   2. plain play()            -> cheapest, works when the media is still good
+    //   3. load() + seek + play()  -> revives a stale stream without a fetch
+    //   4. full playTrack()        -> last resort (re-resolves cache/Azure URL)
+    function resumePlaybackWithRecovery() {
+        if (!audioElement) return;
+        const cur = playQueue[currentTrackIndex];
+        const fullReload = () => { if (cur) playTrack(cur, playQueue, currentTrackIndex); };
+
+        if (audioElement.error || !audioElement.src) { fullReload(); return; }
+
+        const p = audioElement.play();
+        if (!p || !p.then) return;                 // old browsers: no promise, assume ok
+        p.catch(() => {
+            try {
+                const pos = audioElement.currentTime || 0;
+                audioElement.load();               // re-open the same source
+                const seekBack = () => {
+                    if (pos > 0) { try { audioElement.currentTime = pos; } catch (_) {} }
+                    audioElement.removeEventListener("loadedmetadata", seekBack);
+                };
+                audioElement.addEventListener("loadedmetadata", seekBack);
+                const p2 = audioElement.play();
+                if (p2 && p2.catch) p2.catch(fullReload);
+            } catch (_) {
+                fullReload();
+            }
+        });
     }
 
     function initInterruptionRecovery() {
