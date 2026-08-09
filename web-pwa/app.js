@@ -2475,26 +2475,25 @@ document.addEventListener("DOMContentLoaded", () => {
     function initMediaSessionHandlers() {
         if (!("mediaSession" in navigator)) return;
         try {
-            // Play/Pause handlers must exist AND be minimal + synchronous.
+            // ASYMMETRIC BY DESIGN — do not "tidy" this into a matching pair.
             //
-            // They must EXIST because a remote pause is the only way to know the
-            // user deliberately paused: without them, the interruption auto-resume
-            // below could not tell a car/lock-screen Pause from a phone call and
-            // restarted playback ~1.5s later (i.e. "Pause does nothing").
+            // Evidence from device testing: with the app VISIBLE, car/lock-screen
+            // play AND pause both work. With the app collapsed or the phone locked,
+            // pause still works but resume never does. Our JS clearly still runs
+            // (pause proves it) — the resume fails because iOS does not allow a
+            // NON-VISIBLE page to START playback. Every page-initiated route is
+            // blocked by that same rule, which is why load()/playTrack() retries
+            // could never help.
             //
-            // They must be MINIMAL because the earlier versions called playTrack()
-            // — an async fetch/IndexedDB path — which cannot complete when iOS
-            // throttles a backgrounded PWA, so the buttons appeared dead. Just
-            // drive the element directly and set playbackState.
-            navigator.mediaSession.setActionHandler("play", () => {
-                userInitiatedPause = false;
-                resumeAfterInterruption = false;
-                // NOTE: do NOT optimistically set playbackState/isPlaying here. Doing
-                // that flipped the car's Play icon even when play() failed, so the
-                // head unit showed "playing" in silence. The element's own "play"
-                // event is the source of truth and updates the UI on real success.
-                resumePlaybackWithRecovery();
-            });
+            // The one route not subject to it is WebKit's OWN default action, which
+            // runs inside the engine in response to the remote command. Registering
+            // a "play" handler SUPPRESSES that default and forces the blocked path,
+            // so we deliberately leave "play" UNSET.
+            //
+            // "pause" stays registered: stopping audio is always permitted (it
+            // demonstrably works in the background), and it is what lets us mark a
+            // pause as deliberate so the interruption auto-resume never fights it.
+            navigator.mediaSession.setActionHandler("play", null);
             navigator.mediaSession.setActionHandler("pause", () => {
                 // A remote pause is DELIBERATE — never auto-resume it.
                 userInitiatedPause = true;
@@ -2592,6 +2591,11 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         const reloadSeekPlay = () => {
+            // NEVER escalate while the page is hidden. iOS blocks a non-visible
+            // page from starting playback, so load()/playTrack() cannot succeed —
+            // they would only swap the src and risk destroying an audio session
+            // that WebKit's native resume could still recover. Let native handle it.
+            if (document.hidden) return;
             try {
                 const pos = audioElement.currentTime || 0;
                 audioElement.load();               // re-open the same source
@@ -2608,7 +2612,10 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         };
 
-        if (audioElement.error || !audioElement.src) { fullReload(); return; }
+        if (audioElement.error || !audioElement.src) {
+            if (!document.hidden) fullReload();   // same rule: foreground only
+            return;
+        }
 
         const p = audioElement.play();
         if (!p || !p.then) { verifyProgress(reloadSeekPlay); return; }
