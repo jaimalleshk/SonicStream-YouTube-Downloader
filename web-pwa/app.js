@@ -1733,6 +1733,24 @@ document.addEventListener("DOMContentLoaded", () => {
         return window.innerWidth <= 768;
     }
 
+    // Device check used ONLY for audio routing — deliberately NOT width-based.
+    //
+    // isPhoneDevice() is window.innerWidth <= 768, which is fine for layout but
+    // WRONG for audio: rotating the phone to landscape (car mount/cradle) pushes
+    // innerWidth to ~850-930px, so the "no Web Audio on phones" guard silently
+    // failed and createMediaElementSource() ran. That reroutes the element's audio
+    // into the Web Audio graph PERMANENTLY, and iOS suspends the AudioContext on
+    // lock/background — so the playback clock keeps advancing while NO SOUND comes
+    // out. That is the "progress bar moves but I can't hear anything" bug.
+    function isMobileAudioDevice() {
+        const ua = navigator.userAgent || "";
+        const iOS = /iPad|iPhone|iPod/.test(ua) ||
+                    (navigator.platform === "MacIntel" && (navigator.maxTouchPoints || 0) > 1); // iPadOS
+        const android = /Android/i.test(ua);
+        const coarsePointer = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+        return iOS || android || coarsePointer || window.innerWidth <= 768;
+    }
+
     // Hide 'Local iPhone' tab and 'Back' button on Desktop browsers
     if (tabLocal) {
         tabLocal.style.display = isPhoneDevice() ? "inline-block" : "none";
@@ -2392,7 +2410,11 @@ document.addEventListener("DOMContentLoaded", () => {
         // playback and leaves the lock-screen Play button doing nothing; the
         // compressor also causes a stutter/echo on pause. Plain <audio> keeps
         // playing in the background and obeys lock-screen / car Bluetooth controls.
-        if (isPhoneDevice()) return;
+        //
+        // MUST use isMobileAudioDevice(), not isPhoneDevice(): the width-based
+        // check let this run in landscape on a phone, permanently routing audio
+        // into a graph that iOS then suspends (clock advances, silence).
+        if (isMobileAudioDevice()) return;
         if (audioCtx) {
             if (audioCtx.state === "suspended") {
                 audioCtx.resume();
@@ -2622,6 +2644,19 @@ document.addEventListener("DOMContentLoaded", () => {
         p.then(() => verifyProgress(reloadSeekPlay)).catch(reloadSeekPlay);
     }
 
+    // Safety net for the "clock advances but no sound" failure: if a Web Audio
+    // graph exists at all (desktop, or a session created before the landscape bug
+    // was fixed), the element's audio flows THROUGH it — so a suspended context
+    // means silence. Always try to bring it back to "running" when we play or
+    // return to the foreground.
+    function ensureAudioContextRunning() {
+        let ctx = null;
+        try { ctx = audioCtx; } catch (_) { return; }   // TDZ-safe
+        if (ctx && ctx.state === "suspended") {
+            try { ctx.resume(); } catch (_) {}
+        }
+    }
+
     function initInterruptionRecovery() {
         if (!audioElement) return;
 
@@ -2631,6 +2666,7 @@ document.addEventListener("DOMContentLoaded", () => {
             isPlaying = true;
             userInitiatedPause = false;
             resumeAfterInterruption = false;
+            ensureAudioContextRunning();   // never play into a suspended graph
             updatePlayBtnUI();
         });
 
@@ -2663,7 +2699,10 @@ document.addEventListener("DOMContentLoaded", () => {
         // The moment the app/screen comes back, or the page regains focus, is the
         // most reliable point to recover a session lost to an interruption.
         document.addEventListener("visibilitychange", () => {
-            if (!document.hidden) tryResumeAfterInterruption("visibility");
+            if (!document.hidden) {
+                ensureAudioContextRunning();
+                tryResumeAfterInterruption("visibility");
+            }
         });
         window.addEventListener("focus", () => tryResumeAfterInterruption("focus"));
         window.addEventListener("pageshow", () => tryResumeAfterInterruption("pageshow"));
