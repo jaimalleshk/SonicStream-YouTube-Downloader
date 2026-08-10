@@ -789,6 +789,11 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Bump with every deploy. Shown in Settings so we can tell at a glance whether
+    // the phone is actually running the newest build (a stale service-worker cache
+    // otherwise makes a fixed bug look unfixed).
+    const APP_BUILD = "v13";
+
     async function updateCacheUsageUI() {
         const cachedCount = await countCachedTracks();
         let usageStr = "";
@@ -802,7 +807,7 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (e) {}
         }
         if (cacheUsageText) {
-            cacheUsageText.textContent = `${cachedCount} track${cachedCount === 1 ? '' : 's'} cached offline${usageStr}`;
+            cacheUsageText.textContent = `Build ${APP_BUILD} · ${cachedCount} track${cachedCount === 1 ? '' : 's'} cached offline${usageStr}`;
             cacheUsageText.style.color = cachedCount > 0 ? "var(--neon-blue)" : "var(--text-secondary)";
         }
     }
@@ -2154,9 +2159,6 @@ document.addEventListener("DOMContentLoaded", () => {
             // Smart Caching: proactively cache the next 5 tracks so screen-off /
             // car playback plays from IndexedDB (no streaming, no stalls).
             prefetchUpcomingTracks(playQueue, currentTrackIndex, 5);
-            // Pre-resolve the next track's cached blob URL NOW, while we're in the
-            // foreground, so the background advance needs no async work at all.
-            prepareNextTrackUrl();
         } catch (err) {
             console.error("Playback error:", err);
             if (playerStatusEq) playerStatusEq.classList.add("hidden");
@@ -2220,33 +2222,6 @@ document.addEventListener("DOMContentLoaded", () => {
         playTrack(playQueue[prevIdx], playQueue, prevIdx);
     }
 
-    // Pre-resolved object URL for the NEXT track, built while the current track is
-    // still playing. This is what lets the background advance play from cache with
-    // no async work in the `ended` handler (an await there suspends the iOS audio
-    // session). Shape: { trackId, url }.
-    let preparedNextUrl = null;
-
-    async function prepareNextTrackUrl() {
-        try {
-            if (playQueue.length === 0) return;
-            const nextIdx = (currentTrackIndex + 1) % playQueue.length;
-            const nextTrack = playQueue[nextIdx];
-            if (!nextTrack) return;
-            if (preparedNextUrl && preparedNextUrl.trackId === nextTrack.id) return; // already ready
-            // Drop a stale preparation.
-            if (preparedNextUrl) {
-                try { URL.revokeObjectURL(preparedNextUrl.url); } catch (_) {}
-                preparedNextUrl = null;
-            }
-            const rec = await getTrackRecordFromDB(nextTrack.id, nextTrack.title);
-            const blob = rec && (rec.blob || rec.audio_blob);
-            if (blob instanceof Blob && blob.size > 0) {
-                preparedNextUrl = { trackId: nextTrack.id, url: URL.createObjectURL(blob) };
-                console.log("[Audio] Next track ready from cache: " + (nextTrack.title || ""));
-            }
-        } catch (e) { /* non-fatal: we'll just stream */ }
-    }
-
     // Revoke previous blob object URL to avoid leaks across background advances.
     // Background track advancement (screen off / app backgrounded).
     // STABLE, MINIMAL version (reverted): build the media URL SYNCHRONOUSLY and
@@ -2272,32 +2247,14 @@ document.addEventListener("DOMContentLoaded", () => {
         currentTrackIndex = nextIdx;
         isPlaying = true;
 
-        // Use a blob URL prepared EARLIER (while the previous track was still
-        // playing) if we have one for this track. This gives cached, network-free
-        // background playback while still calling play() synchronously — the two
-        // requirements that previously conflicted. Streaming every track is what
-        // made background playback die after 2-3 songs.
-        if (preparedNextUrl && preparedNextUrl.trackId === nextTrack.id) {
-            const url = preparedNextUrl.url;
-            preparedNextUrl = null;          // consumed; don't revoke (now in use)
-            if (currentAudioObjectUrl && currentAudioObjectUrl !== url) {
-                try { URL.revokeObjectURL(currentAudioObjectUrl); } catch (_) {}
-            }
-            currentAudioObjectUrl = url;
-            audioElement.src = url;
-            const pc = audioElement.play();
-            if (pc && pc.catch) pc.catch(() => playTrack(nextTrack, playQueue, nextIdx));
-            updatePlayBtnUI();
-            updateMediaSession(nextTrack);
-            setPlaybackSource("cache");
-            lastPlaybackWasStream = false;
-            if (playerTrackTitle) playerTrackTitle.textContent = nextTrack.title || "";
-            if (playerTrackArtist) playerTrackArtist.textContent = nextTrack.artist || nextTrack.uploader || "SonicStream";
-            if (playerTrackThumb) playerTrackThumb.src = getTrackThumbnailUrl(nextTrack);
-            if (activePlaylistId) saveResumePosition(activePlaylistId, nextTrack.id, 0, nextIdx);
-            prepareNextTrackUrl();           // queue up the one after this
-            return;
-        }
+        // REVERTED (regression): a blob:-URL branch used to run here, playing the
+        // next track from cache. Once caching actually started persisting, that
+        // branch began firing on the phone — and background auto-advance stopped
+        // working ENTIRELY (it previously managed 2-3 songs). Assigning a fresh
+        // blob: URL and calling play() while the page is hidden is not reliable on
+        // iOS. Background advance therefore streams the network URL again, which is
+        // the known-good behaviour. Do not reintroduce blob playback here without
+        // on-device proof.
 
         // CRITICAL (iOS background): advance with ZERO async gap. Any await before
         // play() — an IndexedDB read, or a setTimeout race — lets iOS suspend the
@@ -2319,7 +2276,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (playerTrackArtist) playerTrackArtist.textContent = nextTrack.artist || nextTrack.uploader || "SonicStream";
         if (playerTrackThumb) playerTrackThumb.src = getTrackThumbnailUrl(nextTrack);
         if (activePlaylistId) saveResumePosition(activePlaylistId, nextTrack.id, 0, nextIdx);
-        prepareNextTrackUrl();   // so the FOLLOWING advance can come from cache
     }
 
     // Referenced by audio error handlers but was never defined — prevents ReferenceError
@@ -2553,6 +2509,29 @@ document.addEventListener("DOMContentLoaded", () => {
     let userInitiatedPause = false;   // set by our own Play/Pause UI
     let resumeAfterInterruption = false;
     let interruptionRetryTimer = null;
+    // True when playback was (re)started while the page was hidden. Such a resume
+    // can come back with a DEAD audio session: the clock advances but there is no
+    // sound. The user's own workaround is to pause and play again once the app is
+    // open, which is what re-establishes the session — so we do exactly that
+    // automatically on the next foreground.
+    let resumedWhileHidden = false;
+
+    // Force a pause -> play cycle to re-establish a dead iOS audio session,
+    // preserving the playback position. Only used when we have reason to believe
+    // the session is silent (see resumedWhileHidden).
+    function reviveAudioSession() {
+        if (!audioElement || !audioElement.src || audioElement.paused) return;
+        const pos = audioElement.currentTime;
+        userInitiatedPause = true;            // our own pause: don't arm auto-resume
+        audioElement.pause();
+        setTimeout(() => {
+            userInitiatedPause = false;
+            try { if (pos > 0) audioElement.currentTime = pos; } catch (_) {}
+            const p = audioElement.play();
+            if (p && p.catch) p.catch(() => {});
+            console.log("[Audio] Re-established audio session after a background resume.");
+        }, 60);
+    }
 
     function initAudioSession() {
         try {
@@ -2667,6 +2646,9 @@ document.addEventListener("DOMContentLoaded", () => {
             userInitiatedPause = false;
             resumeAfterInterruption = false;
             ensureAudioContextRunning();   // never play into a suspended graph
+            // Remember a resume that happened while hidden — that is the one that
+            // can come back silent (clock moving, no sound).
+            if (document.hidden) resumedWhileHidden = true;
             updatePlayBtnUI();
         });
 
@@ -2702,6 +2684,12 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!document.hidden) {
                 ensureAudioContextRunning();
                 tryResumeAfterInterruption("visibility");
+                // If playback was resumed while hidden it may be running silently.
+                // Do the pause/play cycle the user otherwise has to do by hand.
+                if (resumedWhileHidden) {
+                    resumedWhileHidden = false;
+                    reviveAudioSession();
+                }
             }
         });
         window.addEventListener("focus", () => tryResumeAfterInterruption("focus"));
