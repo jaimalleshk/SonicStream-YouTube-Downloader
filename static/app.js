@@ -1572,6 +1572,12 @@ document.addEventListener("DOMContentLoaded", () => {
     playerPlayPauseBtn.addEventListener("click", () => {
         if (!playerVideo.src) return;
         if (isPlaying) {
+            // Pausing by hand hands control back to the user: the running
+            // schedule is cancelled instead of resuming on the next tick.
+            if (activeSchedule) {
+                stopScheduledPlayback("paused manually");
+                return;
+            }
             playerVideo.pause();
             isPlaying = false;
         } else {
@@ -1698,6 +1704,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     playerVideo.addEventListener("ended", () => {
+        // A single-file schedule plays its track once, then stops - without
+        // this it would loop, because a one-track queue wraps around.
+        if (activeSchedule && activeSchedule.target_type === "track") {
+            stopScheduledPlayback("single file finished");
+            return;
+        }
         if (isRepeat) {
             playerVideo.currentTime = 0;
             playerVideo.play();
@@ -2125,10 +2137,480 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    // ======================= Auto Play Schedule =======================
+    // Playback entries that start and stop the normal player automatically.
+    // Nothing here duplicates playback logic: it drives selectPlaylist(),
+    // playTrack(), generateShuffleOrder() and the existing player element.
+
+    let scheduleEntries = [];
+    let activeSchedule = null;       // entry currently driving playback
+    let activeScheduleEndsAt = null; // Date the active entry stops at
+    let editingScheduleId = null;
+
+    const schedulerModal = document.getElementById("schedulerModal");
+    const scheduleList = document.getElementById("scheduleList");
+    const scheduleEditor = document.getElementById("scheduleEditor");
+    const schedPlaylist = document.getElementById("schedPlaylist");
+    const schedTrack = document.getElementById("schedTrack");
+    const schedTrackRow = document.getElementById("schedTrackRow");
+    const schedModeRow = document.getElementById("schedModeRow");
+    const schedRepeat = document.getElementById("schedRepeat");
+    const schedDate = document.getElementById("schedDate");
+    const schedDaysRow = document.getElementById("schedDaysRow");
+    const schedStart = document.getElementById("schedStart");
+    const schedEnd = document.getElementById("schedEnd");
+    const schedTitle = document.getElementById("schedTitle");
+    const scheduleFormError = document.getElementById("scheduleFormError");
+    const autoplayActive = document.getElementById("autoplayActive");
+    const autoplayActiveText = document.getElementById("autoplayActiveText");
+    const autoplayActiveSub = document.getElementById("autoplayActiveSub");
+    const autoplayUpcoming = document.getElementById("autoplayUpcoming");
+
+    const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+    // --- date/time helpers (all local time; 0 = Monday) ---
+    const dayIndex = (d) => (d.getDay() + 6) % 7;
+    const toDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+    function atTime(baseDate, hhmm) {
+        const [h, m] = (hhmm || "00:00").split(":").map(Number);
+        const d = new Date(baseDate);
+        d.setHours(h || 0, m || 0, 0, 0);
+        return d;
+    }
+
+    // An end time earlier than the start time means the entry runs past midnight
+    function windowForDay(entry, dayDate) {
+        const start = atTime(dayDate, entry.start_time);
+        let end = atTime(dayDate, entry.end_time);
+        if (end <= start) end = new Date(end.getTime() + 86400000);
+        return { start, end, key: `${toDateStr(dayDate)}T${entry.start_time}` };
+    }
+
+    function entryAppliesOn(entry, dayDate) {
+        if (entry.repeat === "daily") return true;
+        if (entry.repeat === "weekly") return (entry.days || []).includes(dayIndex(dayDate));
+        if (entry.repeat === "once") return entry.date === toDateStr(dayDate);
+        return false;
+    }
+
+    // The window containing `now`, if any (checks yesterday too, for overnight)
+    function currentOccurrence(entry, now) {
+        for (const offset of [0, -1]) {
+            const day = new Date(now);
+            day.setDate(day.getDate() + offset);
+            if (!entryAppliesOn(entry, day)) continue;
+            const w = windowForDay(entry, day);
+            if (now >= w.start && now < w.end) return w;
+        }
+        return null;
+    }
+
+    function nextOccurrence(entry, now) {
+        for (let offset = 0; offset <= 366; offset++) {
+            const day = new Date(now);
+            day.setDate(day.getDate() + offset);
+            if (!entryAppliesOn(entry, day)) continue;
+            const w = windowForDay(entry, day);
+            if (w.start > now) return w;
+        }
+        return null;
+    }
+
+    function describeEntry(entry) {
+        const job = historyJobs.find(j => j.id === entry.playlist_id);
+        const where = job ? job.title : "(missing playlist)";
+        const what = entry.target_type === "track"
+            ? `${entry.track_title || "Single file"} — from ${where}`
+            : `${where} — ${entry.mode === "shuffle" ? "shuffle" : "in order"}`;
+        let when;
+        if (entry.repeat === "daily") when = "Daily";
+        else if (entry.repeat === "weekly") when = (entry.days || []).slice().sort().map(d => DAY_LABELS[d]).join(", ") || "Weekly";
+        else when = entry.date || "Once";
+        return { what, when: `${when} · ${entry.start_time}–${entry.end_time}` };
+    }
+
+    async function loadSchedules() {
+        try {
+            const res = await fetch("/api/schedules");
+            scheduleEntries = await res.json();
+        } catch (e) {
+            console.error("Failed to load schedules:", e);
+            scheduleEntries = [];
+        }
+        renderScheduleList();
+        renderAutoplayPanel();
+    }
+
+    // --- the engine: one tick a second ---
+    async function scheduleTick() {
+        const now = new Date();
+
+        if (activeSchedule && activeScheduleEndsAt && now >= activeScheduleEndsAt) {
+            stopScheduledPlayback("end time reached");
+        }
+
+        // Never fire before the playlists are loaded, otherwise a startup race
+        // would burn the occurrence on a "playlist not found" error.
+        if (!activeSchedule && historyJobs.length > 0) {
+            for (const entry of scheduleEntries) {
+                if (!entry.enabled) continue;
+                const occ = currentOccurrence(entry, now);
+                if (occ && entry.last_fired !== occ.key) {
+                    await startScheduledPlayback(entry, occ);
+                    break;
+                }
+            }
+        }
+
+        renderAutoplayPanel(now);
+    }
+
+    async function startScheduledPlayback(entry, occ) {
+        // Mark the occurrence consumed first, so a failure below (or a manual
+        // stop afterwards) can never make it retrigger in the same window.
+        entry.last_fired = occ.key;
+        fetch(`/api/schedules/${entry.id}/fired`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ last_fired: occ.key })
+        }).catch(() => { /* retriggering is already blocked in memory */ });
+
+        const job = historyJobs.find(j => j.id === entry.playlist_id);
+        if (!job) {
+            logToTerminal(`[Auto Play] "${entry.title}" skipped — its playlist no longer exists.`, true);
+            return;
+        }
+
+        activeSchedule = entry;
+        activeScheduleEndsAt = occ.end;
+        logToTerminal(`[Auto Play] Starting "${entry.title}" — stops at ${entry.end_time}.`);
+
+        await selectPlaylist(job);
+
+        const playable = playlistItems.filter(t => isTrackDownloaded(t));
+        if (playable.length === 0) {
+            logToTerminal(`[Auto Play] "${entry.title}" has no downloaded tracks to play.`, true);
+            activeSchedule = null;
+            activeScheduleEndsAt = null;
+            return;
+        }
+
+        if (entry.target_type === "track") {
+            const track = playlistItems.find(t => t.id === entry.track_id);
+            if (!track || !isTrackDownloaded(track)) {
+                logToTerminal(`[Auto Play] "${entry.title}" — the scheduled file is not downloaded.`, true);
+                activeSchedule = null;
+                activeScheduleEndsAt = null;
+                return;
+            }
+            isShuffle = false;
+            playerShuffleBtn.classList.remove("active");
+            await playTrack(track, [track], 0);
+        } else if (entry.mode === "shuffle") {
+            isShuffle = true;
+            playerShuffleBtn.classList.add("active");
+            const order = generateShuffleOrder(playlistItems);
+            const firstId = order[0];
+            const first = playlistItems.find(t => t.id === firstId);
+            await playTrack(first, playlistItems, playlistItems.findIndex(t => t.id === firstId), 0, order);
+        } else {
+            isShuffle = false;
+            playerShuffleBtn.classList.remove("active");
+            const first = playable[0];
+            await playTrack(first, playlistItems, playlistItems.findIndex(t => t.id === first.id));
+        }
+
+        // Autoplay policies block sound until the window has been interacted
+        // with at least once; say so instead of looking silently broken.
+        if (playerVideo.paused) {
+            logToTerminal(`[Auto Play] "${entry.title}" could not start playback automatically — click anywhere in the app once, then it will work.`, true);
+        }
+    }
+
+    function stopScheduledPlayback(reason) {
+        const entry = activeSchedule;
+        activeSchedule = null;
+        activeScheduleEndsAt = null;
+
+        if (nextTrackTimeout) {
+            clearTimeout(nextTrackTimeout);
+            nextTrackTimeout = null;
+        }
+        if (nextTrackCountdownInterval) {
+            clearInterval(nextTrackCountdownInterval);
+            nextTrackCountdownInterval = null;
+        }
+
+        playerVideo.pause();
+        resetPlayerStatusIdle();
+
+        if (entry) logToTerminal(`[Auto Play] "${entry.title}" stopped — ${reason}.`);
+        renderAutoplayPanel();
+    }
+
+    function renderAutoplayPanel(now = new Date()) {
+        if (!autoplayUpcoming) return;
+
+        if (activeSchedule) {
+            autoplayActive.classList.remove("hidden");
+            autoplayActiveText.textContent = activeSchedule.title;
+            const mins = Math.max(0, Math.round((activeScheduleEndsAt - now) / 60000));
+            autoplayActiveSub.textContent = `Playing now · stops at ${activeSchedule.end_time} (${mins} min left)`;
+        } else {
+            autoplayActive.classList.add("hidden");
+        }
+
+        const upcoming = scheduleEntries
+            .filter(e => e.enabled && e.id !== (activeSchedule && activeSchedule.id))
+            .map(e => ({ entry: e, occ: nextOccurrence(e, now) }))
+            .filter(x => x.occ)
+            .sort((a, b) => a.occ.start - b.occ.start)
+            .slice(0, 3);
+
+        if (upcoming.length === 0) {
+            autoplayUpcoming.innerHTML = `<span style="color: var(--text-secondary);">${scheduleEntries.length ? "Nothing else coming up." : "No playback entries scheduled."}</span>`;
+            return;
+        }
+
+        autoplayUpcoming.innerHTML = upcoming.map(({ entry, occ }) => {
+            const sameDay = toDateStr(occ.start) === toDateStr(now);
+            const dayLabel = sameDay ? "Today" : `${DAY_LABELS[dayIndex(occ.start)]} ${occ.start.getDate()}/${occ.start.getMonth() + 1}`;
+            const d = describeEntry(entry);
+            return `<div style="display: flex; justify-content: space-between; gap: 0.5rem; min-width: 0;">
+                        <span style="color: var(--text-primary); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${d.what}">${entry.title}</span>
+                        <span style="color: var(--neon-purple); flex-shrink: 0;">${dayLabel} ${entry.start_time}</span>
+                    </div>`;
+        }).join("");
+    }
+
+    // --- schedule list + editor ---
+    function renderScheduleList() {
+        if (!scheduleList) return;
+        if (scheduleEntries.length === 0) {
+            scheduleList.innerHTML = `<div style="color: var(--text-secondary); font-size: 0.78rem; padding: 0.5rem 0;">No playback entries yet. Create one to start music automatically at a set time.</div>`;
+            return;
+        }
+
+        scheduleList.innerHTML = "";
+        scheduleEntries.forEach(entry => {
+            const d = describeEntry(entry);
+            const isRunning = activeSchedule && activeSchedule.id === entry.id;
+            const row = document.createElement("div");
+            row.className = `schedule-row ${entry.enabled ? "" : "disabled"} ${isRunning ? "running" : ""}`;
+            row.innerHTML = `
+                <input type="checkbox" class="sched-enabled" ${entry.enabled ? "checked" : ""} title="${entry.enabled ? "Disable" : "Enable"}" style="width: 15px; height: 15px; accent-color: var(--neon-purple); cursor: pointer; flex-shrink: 0;">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        ${entry.title}${isRunning ? ` <span style="color: var(--neon-purple); font-size: 0.7rem;">• playing</span>` : ""}
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${d.what}</div>
+                </div>
+                <div style="font-size: 0.72rem; color: var(--neon-purple); font-weight: 600; text-align: right; flex-shrink: 0;">${d.when}</div>
+                <button class="schedule-row-btn sched-edit" title="Edit entry">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
+                </button>
+                <button class="schedule-row-btn sched-delete" title="Delete entry" style="color: var(--error);">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+            `;
+
+            row.querySelector(".sched-enabled").addEventListener("change", async (e) => {
+                entry.enabled = e.target.checked;
+                if (!entry.enabled && activeSchedule && activeSchedule.id === entry.id) {
+                    stopScheduledPlayback("entry disabled");
+                }
+                await saveEntry(entry, entry.id);
+                renderScheduleList();
+                renderAutoplayPanel();
+            });
+
+            row.querySelector(".sched-edit").addEventListener("click", () => openScheduleEditor(entry));
+
+            row.querySelector(".sched-delete").addEventListener("click", async () => {
+                if (!confirm(`Delete playback entry "${entry.title}"?`)) return;
+                try {
+                    const res = await fetch(`/api/schedules/${entry.id}`, { method: "DELETE" });
+                    if (res.ok) {
+                        if (activeSchedule && activeSchedule.id === entry.id) stopScheduledPlayback("entry deleted");
+                        logToTerminal(`[Auto Play] Deleted entry "${entry.title}".`);
+                        await loadSchedules();
+                    }
+                } catch (err) {
+                    console.error("Delete schedule failed:", err);
+                }
+            });
+
+            scheduleList.appendChild(row);
+        });
+    }
+
+    // Playable targets: real playlists plus the virtual "All Downloads"
+    function schedulablePlaylists() {
+        return historyJobs.filter(j => !j.deleted && j.id !== "deleted_tracks");
+    }
+
+    function populatePlaylistOptions(selectedId) {
+        schedPlaylist.innerHTML = schedulablePlaylists()
+            .map(j => `<option value="${j.id}" ${j.id === selectedId ? "selected" : ""}>${j.title}</option>`)
+            .join("");
+        populateTrackOptions();
+    }
+
+    function populateTrackOptions(selectedTrackId) {
+        const job = historyJobs.find(j => j.id === schedPlaylist.value);
+        const tracks = ((job && job.items) || []).filter(t =>
+            (t.status === "completed" || (t.status === "skipped" && !t.file_missing))
+        );
+        schedTrack.innerHTML = tracks.length
+            ? tracks.map(t => `<option value="${t.id}" ${t.id === selectedTrackId ? "selected" : ""}>${t.title}</option>`).join("")
+            : `<option value="">No downloaded tracks in this playlist</option>`;
+    }
+
+    function setPillGroup(name, value) {
+        document.querySelectorAll(`input[name="${name}"]`).forEach(r => {
+            r.checked = r.value === value;
+            r.closest(".header-pill-btn")?.classList.toggle("active", r.checked);
+        });
+    }
+
+    function currentPill(name) {
+        return document.querySelector(`input[name="${name}"]:checked`)?.value;
+    }
+
+    function syncEditorVisibility() {
+        const isTrack = currentPill("schedTarget") === "track";
+        schedTrackRow.classList.toggle("hidden", !isTrack);
+        // Order/shuffle is meaningless for a single file
+        schedModeRow.classList.toggle("hidden", isTrack);
+
+        const repeat = schedRepeat.value;
+        schedDate.classList.toggle("hidden", repeat !== "once");
+        schedDaysRow.classList.toggle("hidden", repeat !== "weekly");
+
+        const overnight = schedEnd.value && schedStart.value && schedEnd.value <= schedStart.value;
+        document.getElementById("schedOvernightNote").classList.toggle("hidden", !overnight);
+    }
+
+    function openScheduleEditor(entry) {
+        editingScheduleId = entry ? entry.id : null;
+        scheduleFormError.textContent = "";
+        document.getElementById("scheduleEditorTitle").textContent = entry ? "Edit Playback Entry" : "New Playback Entry";
+
+        schedTitle.value = entry ? entry.title : "";
+        populatePlaylistOptions(entry ? entry.playlist_id : (schedulablePlaylists()[0] || {}).id);
+        setPillGroup("schedTarget", entry ? entry.target_type : "playlist");
+        setPillGroup("schedMode", entry ? entry.mode : "order");
+        if (entry && entry.target_type === "track") populateTrackOptions(entry.track_id);
+        schedRepeat.value = entry ? entry.repeat : "once";
+        schedDate.value = entry && entry.date ? entry.date : toDateStr(new Date());
+        document.querySelectorAll("#schedDaysRow input").forEach(cb => {
+            cb.checked = !!(entry && (entry.days || []).includes(Number(cb.value)));
+        });
+        schedStart.value = entry ? entry.start_time : "08:00";
+        schedEnd.value = entry ? entry.end_time : "09:00";
+
+        syncEditorVisibility();
+        scheduleEditor.classList.remove("hidden");
+        schedTitle.focus();
+    }
+
+    function closeScheduleEditor() {
+        scheduleEditor.classList.add("hidden");
+        editingScheduleId = null;
+    }
+
+    async function saveEntry(payload, id) {
+        const url = id ? `/api/schedules/${id}` : "/api/schedules";
+        const res = await fetch(url, {
+            method: id ? "PUT" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || "Could not save the entry");
+        }
+        return res.json();
+    }
+
+    if (document.getElementById("btnSaveSchedule")) {
+        document.getElementById("btnSaveSchedule").addEventListener("click", async () => {
+            const job = historyJobs.find(j => j.id === schedPlaylist.value);
+            const isTrack = currentPill("schedTarget") === "track";
+            const trackId = schedTrack.value;
+            const existing = scheduleEntries.find(e => e.id === editingScheduleId);
+
+            const payload = {
+                title: schedTitle.value.trim() || (job ? job.title : "Playback entry"),
+                enabled: existing ? existing.enabled : true,
+                target_type: isTrack ? "track" : "playlist",
+                playlist_id: schedPlaylist.value,
+                track_id: isTrack ? trackId : null,
+                track_title: isTrack ? (schedTrack.options[schedTrack.selectedIndex] || {}).text : null,
+                mode: isTrack ? "order" : currentPill("schedMode"),
+                repeat: schedRepeat.value,
+                date: schedRepeat.value === "once" ? schedDate.value : null,
+                days: schedRepeat.value === "weekly"
+                    ? [...document.querySelectorAll("#schedDaysRow input:checked")].map(cb => Number(cb.value))
+                    : [],
+                start_time: schedStart.value,
+                end_time: schedEnd.value,
+                last_fired: null   // saving re-arms the entry for the current window
+            };
+
+            if (isTrack && !trackId) {
+                scheduleFormError.textContent = "Pick a downloaded track";
+                return;
+            }
+
+            try {
+                await saveEntry(payload, editingScheduleId);
+                logToTerminal(`[Auto Play] Saved entry "${payload.title}".`);
+                closeScheduleEditor();
+                await loadSchedules();
+            } catch (e) {
+                scheduleFormError.textContent = e.message;
+            }
+        });
+    }
+
+    document.getElementById("btnNewSchedule")?.addEventListener("click", () => openScheduleEditor(null));
+    document.getElementById("btnCancelSchedule")?.addEventListener("click", closeScheduleEditor);
+    schedPlaylist?.addEventListener("change", () => populateTrackOptions());
+    schedRepeat?.addEventListener("change", syncEditorVisibility);
+    schedStart?.addEventListener("change", syncEditorVisibility);
+    schedEnd?.addEventListener("change", syncEditorVisibility);
+    document.querySelectorAll('input[name="schedTarget"], input[name="schedMode"]').forEach(radio => {
+        radio.addEventListener("change", (e) => {
+            document.querySelectorAll(`input[name="${e.target.name}"]`).forEach(r => {
+                r.closest(".header-pill-btn")?.classList.remove("active");
+            });
+            e.target.closest(".header-pill-btn")?.classList.add("active");
+            if (e.target.name === "schedTarget") populateTrackOptions();
+            syncEditorVisibility();
+        });
+    });
+
+    function openSchedulerModal() {
+        schedulerModal.classList.remove("hidden");
+        closeScheduleEditor();
+        loadSchedules();
+    }
+
+    document.getElementById("btnOpenScheduler")?.addEventListener("click", openSchedulerModal);
+    document.getElementById("btnPanelAddSchedule")?.addEventListener("click", openSchedulerModal);
+    document.getElementById("btnCloseScheduler")?.addEventListener("click", () => schedulerModal.classList.add("hidden"));
+    schedulerModal?.addEventListener("click", (e) => {
+        if (e.target === schedulerModal) schedulerModal.classList.add("hidden");
+    });
+
     // Start-up initialization
     loadDefaultDir();
     loadSidebar();
     initResizableColumns();
+    loadSchedules();
+    setInterval(scheduleTick, 1000);
     // Reattach to an in-flight download after a page reload/app restart so the
     // Active Job HUD keeps reporting progress (harmless when idle).
     startProgressStream();

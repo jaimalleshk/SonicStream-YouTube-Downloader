@@ -43,6 +43,10 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 HISTORY_FILE = os.path.join(BASE_DIR, "history.json")
 history_lock = threading.Lock()
 
+# Auto Play Schedule config
+SCHEDULES_FILE = os.path.join(BASE_DIR, "schedules.json")
+schedules_lock = threading.Lock()
+
 # Mount static files
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
@@ -177,6 +181,19 @@ def trigger_full_azure_sync():
             except Exception as e:
                 print(f"[Azure Sync Error] {e}")
         threading.Thread(target=_run_batch, daemon=True).start()
+
+# Permanent YouTube failures: retrying these can never succeed, so they get a
+# terminal "unavailable" status instead of "error" and are excluded from
+# auto-resume (a Force All / manual selection can still retry them).
+PERMANENT_DL_ERROR_PATTERNS = (
+    "video unavailable",
+    "private video",
+    "account associated with this video has been terminated",
+    "no longer available",
+    "video has been removed",
+    "blocked it in your country",
+    "blocked in your country",
+)
 
 def is_permanent_download_error(msg: str) -> bool:
     m = (msg or "").lower()
@@ -2586,6 +2603,151 @@ async def trigger_azure_sync():
     """Triggers background sync of all local downloaded tracks to Azure Storage Blob."""
     trigger_full_azure_sync()
     return {"message": "Azure Storage Blob batch sync started in background"}
+
+
+# ---------------------------------------------------------------------------
+# Auto Play Schedule module
+#
+# Stores playback entries (what to play, in which mode, between which times).
+# The trigger engine itself lives in the desktop UI because the player is the
+# webview's audio element - this module only persists and serves the entries,
+# with the same atomic-write + .bak safety used for history.json.
+# ---------------------------------------------------------------------------
+
+class ScheduleEntry(BaseModel):
+    id: Optional[str] = None
+    title: str = "Playback entry"
+    enabled: bool = True
+    target_type: str = "playlist"        # "playlist" | "track"
+    playlist_id: Optional[str] = None
+    track_id: Optional[str] = None
+    track_title: Optional[str] = None    # cached for display only
+    mode: str = "order"                  # "order" | "shuffle"
+    repeat: str = "once"                 # "once" | "daily" | "weekly"
+    date: Optional[str] = None           # YYYY-MM-DD, used when repeat == "once"
+    days: List[int] = []                 # 0=Mon .. 6=Sun, used when repeat == "weekly"
+    start_time: str = "08:00"            # HH:MM, local time
+    end_time: str = "09:00"              # HH:MM; earlier than start = overnight
+    last_fired: Optional[str] = None     # occurrence key already started
+
+def load_schedules():
+    for path in (SCHEDULES_FILE, SCHEDULES_FILE + ".bak"):
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return data
+        except Exception as e:
+            print(f"[Schedules] Failed to read {path}: {e}")
+    return []
+
+def save_schedules(entries):
+    try:
+        tmp_path = SCHEDULES_FILE + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(entries, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        for attempt in range(3):
+            try:
+                if os.path.exists(SCHEDULES_FILE):
+                    os.replace(SCHEDULES_FILE, SCHEDULES_FILE + ".bak")
+                os.replace(tmp_path, SCHEDULES_FILE)
+                return
+            except OSError as e:
+                if attempt == 2:
+                    print(f"[Schedules] Save failed after retries: {e}")
+                else:
+                    time.sleep(0.05)
+    except Exception as e:
+        print(f"[Schedules] Save failed: {e}")
+
+def _validate_entry(entry: ScheduleEntry):
+    for field, value in (("start_time", entry.start_time), ("end_time", entry.end_time)):
+        try:
+            datetime.strptime(value, "%H:%M")
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail=f"{field} must be in HH:MM format")
+    if entry.start_time == entry.end_time:
+        raise HTTPException(status_code=400, detail="start_time and end_time cannot be identical")
+    if entry.target_type not in ("playlist", "track"):
+        raise HTTPException(status_code=400, detail="target_type must be 'playlist' or 'track'")
+    if entry.mode not in ("order", "shuffle"):
+        raise HTTPException(status_code=400, detail="mode must be 'order' or 'shuffle'")
+    if entry.repeat not in ("once", "daily", "weekly"):
+        raise HTTPException(status_code=400, detail="repeat must be 'once', 'daily' or 'weekly'")
+    if not entry.playlist_id:
+        raise HTTPException(status_code=400, detail="playlist_id is required")
+    if entry.target_type == "track" and not entry.track_id:
+        raise HTTPException(status_code=400, detail="track_id is required for single-track entries")
+    if entry.repeat == "once":
+        if not entry.date:
+            raise HTTPException(status_code=400, detail="date is required when repeat is 'once'")
+        try:
+            datetime.strptime(entry.date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="date must be in YYYY-MM-DD format")
+    if entry.repeat == "weekly":
+        if not entry.days:
+            raise HTTPException(status_code=400, detail="select at least one weekday")
+        if any(d < 0 or d > 6 for d in entry.days):
+            raise HTTPException(status_code=400, detail="days must be between 0 (Mon) and 6 (Sun)")
+
+@app.get("/api/schedules")
+async def get_schedules():
+    with schedules_lock:
+        return load_schedules()
+
+@app.post("/api/schedules")
+async def create_schedule(entry: ScheduleEntry):
+    _validate_entry(entry)
+    with schedules_lock:
+        entries = load_schedules()
+        new_entry = entry.model_dump()
+        new_entry["id"] = f"sched_{int(time.time() * 1000)}"
+        new_entry["created_at"] = datetime.now().isoformat()
+        entries.append(new_entry)
+        save_schedules(entries)
+    return new_entry
+
+@app.put("/api/schedules/{schedule_id}")
+async def update_schedule(schedule_id: str, entry: ScheduleEntry):
+    _validate_entry(entry)
+    with schedules_lock:
+        entries = load_schedules()
+        for idx, existing in enumerate(entries):
+            if existing.get("id") == schedule_id:
+                updated = entry.model_dump()
+                updated["id"] = schedule_id
+                updated["created_at"] = existing.get("created_at")
+                entries[idx] = updated
+                save_schedules(entries)
+                return updated
+    raise HTTPException(status_code=404, detail="Schedule entry not found")
+
+@app.patch("/api/schedules/{schedule_id}/fired")
+async def mark_schedule_fired(schedule_id: str, payload: dict):
+    """Records the occurrence the UI just started, so it is never replayed."""
+    with schedules_lock:
+        entries = load_schedules()
+        for existing in entries:
+            if existing.get("id") == schedule_id:
+                existing["last_fired"] = payload.get("last_fired")
+                save_schedules(entries)
+                return existing
+    raise HTTPException(status_code=404, detail="Schedule entry not found")
+
+@app.delete("/api/schedules/{schedule_id}")
+async def delete_schedule(schedule_id: str):
+    with schedules_lock:
+        entries = load_schedules()
+        remaining = [e for e in entries if e.get("id") != schedule_id]
+        if len(remaining) == len(entries):
+            raise HTTPException(status_code=404, detail="Schedule entry not found")
+        save_schedules(remaining)
+    return {"message": "Schedule entry deleted"}
 
 
 if __name__ == "__main__":

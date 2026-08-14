@@ -56,6 +56,13 @@
             </div>
 
             <div class="header-actions" style="display: flex; align-items: center; gap: 0.75rem;">
+                <button class="btn btn-secondary open-folder-btn" id="btnOpenScheduler" title="Auto Play Schedule">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    Auto Play
+                </button>
                 <button class="btn btn-secondary open-folder-btn" id="btnOpenSettings" title="Settings">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="3"/>
@@ -136,7 +143,29 @@
                 </div>
 
                 <!-- Right Column: reserved utility panel (weather / stats — see GitHub issue #13) -->
-                <div id="utilityPanel" style="border: 1px dashed var(--border-color); border-radius: 12px; display: flex; align-items: center; justify-content: center; min-height: 168px; color: var(--text-secondary); font-size: 0.8rem; text-align: center; padding: 1rem;">
+                <div id="utilityPanel" class="autoplay-panel" style="border: 1px solid var(--border-color); border-radius: 12px; display: flex; flex-direction: column; height: 168px; padding: 0.75rem 0.9rem; overflow: hidden;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.4rem;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--neon-purple)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2"/>
+                                <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                            </svg>
+                            <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary);">Auto Play Schedule</span>
+                        </div>
+                        <button id="btnPanelAddSchedule" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; border-radius: 6px;">Manage</button>
+                    </div>
+                    <div id="autoplayActive" class="hidden" style="border: 1px solid rgba(156, 39, 176, 0.35); background: rgba(156, 39, 176, 0.08); border-radius: 8px; padding: 0.4rem 0.55rem; margin-bottom: 0.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.4rem; min-width: 0;">
+                            <div class="pulse-ring" style="width: 7px; height: 7px; background-color: var(--neon-purple);"></div>
+                            <span id="autoplayActiveText" style="font-size: 0.72rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
+                        </div>
+                        <div id="autoplayActiveSub" style="font-size: 0.68rem; color: var(--neon-purple); margin-top: 0.1rem;"></div>
+                    </div>
+                    <div style="font-size: 0.68rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem;">Next up</div>
+                    <div id="autoplayUpcoming" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.72rem;">
+                        <span style="color: var(--text-secondary);">No playback entries scheduled.</span>
+                    </div>
+                </div>
                     Reserved panel — weather / stats widget coming here (issue #13)
                 </div>
             </section>
@@ -285,6 +314,117 @@
                 
             </div>
         </main>
+    </div>
+
+    <!-- Auto Play Schedule Modal -->
+    <div id="schedulerModal" class="modal-overlay hidden">
+        <div class="modal" style="max-width: 720px; width: 95%;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--neon-purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 0;">Auto Play Schedule</h3>
+                </div>
+                <button id="btnCloseScheduler" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.25rem; font-weight: bold; line-height: 1;">&times;</button>
+            </div>
+
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 1rem; text-align: left; padding: 1.25rem 1.5rem; max-height: 460px; overflow-y: auto;">
+                <!-- Existing playback entries -->
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--neon-purple); text-transform: uppercase; margin: 0;">Playback Entries</h4>
+                    <button id="btnNewSchedule" class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px;">+ New Entry</button>
+                </div>
+
+                <div id="scheduleList" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <!-- Entry rows injected here -->
+                </div>
+
+                <!-- Entry editor -->
+                <div id="scheduleEditor" class="hidden" style="border: 1px solid rgba(156, 39, 176, 0.3); background: rgba(156, 39, 176, 0.05); border-radius: 10px; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <h4 id="scheduleEditorTitle" style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary); margin: 0;">New Playback Entry</h4>
+                        <span id="scheduleFormError" style="font-size: 0.7rem; color: var(--error);"></span>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem;">
+                        <label style="width: 92px; flex-shrink: 0; color: var(--text-secondary);">Name</label>
+                        <input type="text" id="schedTitle" placeholder="Morning music" style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; padding: 0.35rem 0.55rem; font-size: 0.78rem;">
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem;">
+                        <label style="width: 92px; flex-shrink: 0; color: var(--text-secondary);">Play</label>
+                        <div class="header-pill-group" style="display: flex; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px;">
+                            <label class="header-pill-btn active" style="padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.72rem; font-weight: 600; cursor: pointer; color: var(--text-secondary);">
+                                <input type="radio" name="schedTarget" value="playlist" checked style="display: none;">Playlist
+                            </label>
+                            <label class="header-pill-btn" style="padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.72rem; font-weight: 600; cursor: pointer; color: var(--text-secondary);">
+                                <input type="radio" name="schedTarget" value="track" style="display: none;">Single file
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem;">
+                        <label style="width: 92px; flex-shrink: 0; color: var(--text-secondary);">Playlist</label>
+                        <select id="schedPlaylist" style="flex: 1; background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; padding: 0.35rem 0.55rem; font-size: 0.78rem; cursor: pointer;"></select>
+                    </div>
+
+                    <div id="schedTrackRow" class="hidden" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem;">
+                        <label style="width: 92px; flex-shrink: 0; color: var(--text-secondary);">Track</label>
+                        <select id="schedTrack" style="flex: 1; background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; padding: 0.35rem 0.55rem; font-size: 0.78rem; cursor: pointer;"></select>
+                    </div>
+
+                    <div id="schedModeRow" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem;">
+                        <label style="width: 92px; flex-shrink: 0; color: var(--text-secondary);">Order</label>
+                        <div class="header-pill-group" style="display: flex; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px;">
+                            <label class="header-pill-btn active" style="padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.72rem; font-weight: 600; cursor: pointer; color: var(--text-secondary);">
+                                <input type="radio" name="schedMode" value="order" checked style="display: none;">In order
+                            </label>
+                            <label class="header-pill-btn" style="padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.72rem; font-weight: 600; cursor: pointer; color: var(--text-secondary);">
+                                <input type="radio" name="schedMode" value="shuffle" style="display: none;">Shuffle
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; flex-wrap: wrap;">
+                        <label style="width: 92px; flex-shrink: 0; color: var(--text-secondary);">Repeat</label>
+                        <select id="schedRepeat" style="background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; padding: 0.35rem 0.55rem; font-size: 0.78rem; cursor: pointer;">
+                            <option value="once">Once</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                        </select>
+                        <input type="date" id="schedDate" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.78rem;">
+                        <div id="schedDaysRow" class="hidden" style="display: flex; gap: 0.25rem;">
+                            <label class="day-chip"><input type="checkbox" value="0" style="display:none;"><span>Mon</span></label>
+                            <label class="day-chip"><input type="checkbox" value="1" style="display:none;"><span>Tue</span></label>
+                            <label class="day-chip"><input type="checkbox" value="2" style="display:none;"><span>Wed</span></label>
+                            <label class="day-chip"><input type="checkbox" value="3" style="display:none;"><span>Thu</span></label>
+                            <label class="day-chip"><input type="checkbox" value="4" style="display:none;"><span>Fri</span></label>
+                            <label class="day-chip"><input type="checkbox" value="5" style="display:none;"><span>Sat</span></label>
+                            <label class="day-chip"><input type="checkbox" value="6" style="display:none;"><span>Sun</span></label>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem;">
+                        <label style="width: 92px; flex-shrink: 0; color: var(--text-secondary);">Time</label>
+                        <input type="time" id="schedStart" value="08:00" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.78rem;">
+                        <span style="color: var(--text-secondary);">to</span>
+                        <input type="time" id="schedEnd" value="09:00" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.78rem;">
+                        <span id="schedOvernightNote" class="hidden" style="font-size: 0.68rem; color: var(--neon-purple);">ends next day</span>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.25rem;">
+                        <button id="btnCancelSchedule" class="btn btn-secondary" style="padding: 0.35rem 0.85rem; font-size: 0.75rem; border-radius: 6px;">Cancel</button>
+                        <button id="btnSaveSchedule" class="btn btn-primary" style="padding: 0.35rem 0.85rem; font-size: 0.75rem; border-radius: 6px;">Save Entry</button>
+                    </div>
+                </div>
+
+                <p style="font-size: 0.68rem; color: var(--text-secondary); margin: 0; line-height: 1.5;">
+                    Entries start and stop playback automatically while SonicStream is open, using the normal player controls. Only downloaded tracks are played. Stopping playback yourself cancels the rest of that run.
+                </p>
+            </div>
+        </div>
     </div>
 
     <!-- Settings Modal -->

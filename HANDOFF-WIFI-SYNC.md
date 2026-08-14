@@ -247,3 +247,63 @@ All work tracked as GitHub issues (jaimalleshk/SonicStream-YouTube-Downloader
   pause-counter items was re-confirmed as already fixed (previous session).
 - Verified live on a real All Songs resume: HUD shows job-wide 621/833
   matching the sidebar.
+
+## Session 2026-08-13: Auto Play Schedule module (#36) + history regression (#37)
+
+Scope note: desktop app only. `web-pwa/` was explicitly out of scope this
+session (Antigravity owns that area and has taken it a long way).
+
+### #37 — regression found in HEAD, fixed first (was blocking)
+
+`is_permanent_download_error()` referenced `PERMANENT_DL_ERROR_PATTERNS`, but
+the tuple itself was missing from the branch — the function survived a later
+merge while its constant did not. Effect: **GET /api/history returned 500**
+for any history containing a track with status `error`, which breaks the
+desktop playlist sidebar and everything that loads history. Constant restored
+next to the function. Worth a glance at whether the PWA side inherited the
+same gap.
+
+### #36 — Auto Play Schedule
+
+Terminology per the owner: the module is **Auto Play Schedule**, items are
+**playback entries** (not "appointments").
+
+**Nothing about playback was rewritten.** The engine drives the existing
+components: `selectPlaylist()`, `playTrack()`, `generateShuffleOrder()`,
+`isTrackDownloaded()` and the same `#playerVideo` element/controls.
+
+- **Storage:** `schedules.json`, atomic write + `.bak` fallback, same pattern
+  as history.json. Backup/tmp files gitignored.
+- **API:** `GET/POST /api/schedules`, `PUT/DELETE /api/schedules/{id}`,
+  `PATCH /api/schedules/{id}/fired` (records the consumed occurrence).
+  Server-side validation of times, repeat, weekday range and targets.
+- **Entry model:** playlist *or* single file; `mode` order|shuffle (ignored
+  for single files); repeat once(date) | daily | weekly(days[]); start/end
+  time; `enabled`; `last_fired` occurrence key.
+- **Engine (`scheduleTick`, 1 s):** starts an entry when now falls inside its
+  window, stops playback at end time, and writes `last_fired` so an
+  occurrence never double-fires or restarts after a manual stop. Guarded so
+  it cannot fire before `historyJobs` has loaded (startup race would have
+  burned the occurrence on a bogus "playlist not found").
+- **Overnight windows** (end <= start) roll into the next day; the current
+  occurrence check also looks at yesterday for exactly this case.
+- **Single-file entries stop after the track ends** — without the guard in the
+  `ended` handler a one-track queue wraps around and loops forever.
+- **Manual pause cancels the run** (hands control back to the user).
+- **UI:** "Auto Play" header button + modal (entry list with enable/edit/
+  delete, and an editor with playlist/single-file, order/shuffle, repeat with
+  weekday chips, start/end times, overnight hint). The reserved
+  `#utilityPanel` from #13 is now the schedule panel: active entry with
+  minutes remaining, plus the next three upcoming entries.
+- **Autoplay policy:** if the browser/webview blocks automatic playback, the
+  console line says so explicitly instead of failing silently.
+
+**Verified live** (real audio, real playlist): auto-start inside an open
+window with shuffle applied; auto-stop at end time with the player returned
+to "Ready"; no restart while the window stayed open; single-file entry played
+once and stopped without advancing; `last_fired` persisted and `.bak`
+rotated; recurrence math — overnight showed "Today 23:00", weekly landed on
+the right weekday two days out, a past-dated once-entry never fired.
+
+Issue #13 is now effectively answered for the panel space (schedule status);
+weather/stats can still be revisited separately.

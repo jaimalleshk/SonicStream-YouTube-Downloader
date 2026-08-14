@@ -8,6 +8,8 @@ __pycache__/
 sync_config.json
 history.json.bak
 history.json.tmp
+schedules.json.bak
+schedules.json.tmp
 history.json*.corrupt-*
 history-manual-backup-*.json
 history-git-head.tmp.json
