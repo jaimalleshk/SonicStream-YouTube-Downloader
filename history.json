@@ -315,9 +315,9 @@
     "url": "https://www.youtube.com/watch?v=efv3iHUarxY&list=PLcqF0SS4XiHFvtqCcHdDHrKGw_r9aRCak",
     "timestamp": "2026-07-03T21:52:19.078681",
     "total_tracks": 833,
-    "completed_tracks": 770,
+    "completed_tracks": 779,
     "success_count": 649,
-    "failure_count": 121,
+    "failure_count": 130,
     "is_playlist": true,
     "format": "audio",
     "quality": "highest",
@@ -502,8 +502,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:38:01",
-        "end_time": "20:38:01",
+        "start_time": "20:52:32",
+        "end_time": "20:52:32",
         "error_detail": ""
       },
       {
@@ -544,8 +544,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:24",
-        "end_time": "20:37:26",
+        "start_time": "20:56:00",
+        "end_time": "20:56:00",
         "error_detail": ""
       },
       {
@@ -558,8 +558,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:29",
-        "end_time": "20:37:29",
+        "start_time": "20:56:03",
+        "end_time": "20:56:03",
         "error_detail": ""
       },
       {
@@ -628,8 +628,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:29",
-        "end_time": "20:37:29",
+        "start_time": "20:56:03",
+        "end_time": "20:56:03",
         "error_detail": ""
       },
       {
@@ -670,8 +670,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:03",
-        "end_time": "20:37:03",
+        "start_time": "20:55:38",
+        "end_time": "20:55:38",
         "error_detail": ""
       },
       {
@@ -768,8 +768,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:46",
-        "end_time": "20:37:46",
+        "start_time": "20:52:11",
+        "end_time": "20:52:11",
         "error_detail": ""
       },
       {
@@ -810,8 +810,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:35:38",
-        "end_time": "20:35:40",
+        "start_time": "20:54:22",
+        "end_time": "20:54:22",
         "error_detail": ""
       },
       {
@@ -838,8 +838,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:59",
-        "end_time": "20:38:00",
+        "start_time": "20:52:26",
+        "end_time": "20:52:26",
         "error_detail": ""
       },
       {
@@ -852,8 +852,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:36:28",
-        "end_time": "20:36:29",
+        "start_time": "20:55:04",
+        "end_time": "20:55:04",
         "error_detail": ""
       },
       {
@@ -1048,8 +1048,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:27",
-        "end_time": "20:37:27",
+        "start_time": "20:56:01",
+        "end_time": "20:56:01",
         "error_detail": ""
       },
       {
@@ -1090,8 +1090,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:58",
-        "end_time": "20:37:58",
+        "start_time": "20:52:23",
+        "end_time": "20:52:24",
         "error_detail": ""
       },
       {
@@ -1104,8 +1104,8 @@
         "status": "unavailable",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "20:37:32",
-        "end_time": "20:37:33",
+        "start_time": "20:51:58",
+        "end_time": "20:51:59",
         "error_detail": "ERROR: [youtube] NgbsRyl2cGQ: Video unavailable. This video is no longer available because the YouTube account associated with this video has been terminated."
       },
       {
@@ -1146,8 +1146,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:36:04",
-        "end_time": "20:36:05",
+        "start_time": "20:54:43",
+        "end_time": "20:54:43",
         "error_detail": ""
       },
       {
@@ -1174,8 +1174,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:34:32",
-        "end_time": "20:34:32",
+        "start_time": "20:53:18",
+        "end_time": "20:53:18",
         "error_detail": ""
       },
       {
@@ -1188,8 +1188,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:29",
-        "end_time": "20:37:29",
+        "start_time": "20:56:04",
+        "end_time": "20:56:04",
         "error_detail": ""
       },
       {
@@ -1202,8 +1202,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:28",
-        "end_time": "20:37:28",
+        "start_time": "20:56:03",
+        "end_time": "20:56:03",
         "error_detail": ""
       },
       {
@@ -1216,8 +1216,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:34:46",
-        "end_time": "20:34:46",
+        "start_time": "20:53:30",
+        "end_time": "20:53:30",
         "error_detail": ""
       },
       {
@@ -1230,8 +1230,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:36:52",
-        "end_time": "20:36:52",
+        "start_time": "20:55:27",
+        "end_time": "20:55:27",
         "error_detail": ""
       },
       {
@@ -1258,8 +1258,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:36:51",
-        "end_time": "20:36:51",
+        "start_time": "20:55:27",
+        "end_time": "20:55:27",
         "error_detail": ""
       },
       {
@@ -1314,8 +1314,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:28",
-        "end_time": "20:37:28",
+        "start_time": "20:56:02",
+        "end_time": "20:56:03",
         "error_detail": ""
       },
       {
@@ -1356,8 +1356,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:36:40",
-        "end_time": "20:36:41",
+        "start_time": "20:55:16",
+        "end_time": "20:55:16",
         "error_detail": ""
       },
       {
@@ -1398,8 +1398,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:26",
-        "end_time": "20:37:26",
+        "start_time": "20:56:00",
+        "end_time": "20:56:01",
         "error_detail": ""
       },
       {
@@ -1412,8 +1412,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:27",
-        "end_time": "20:37:27",
+        "start_time": "20:56:01",
+        "end_time": "20:56:02",
         "error_detail": ""
       },
       {
@@ -1440,8 +1440,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:36:04",
-        "end_time": "20:36:04",
+        "start_time": "20:54:42",
+        "end_time": "20:54:42",
         "error_detail": ""
       },
       {
@@ -1566,8 +1566,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:33",
-        "end_time": "20:37:34",
+        "start_time": "20:51:59",
+        "end_time": "20:51:59",
         "error_detail": ""
       },
       {
@@ -1580,8 +1580,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:34:33",
-        "end_time": "20:34:33",
+        "start_time": "20:53:19",
+        "end_time": "20:53:19",
         "error_detail": ""
       },
       {
@@ -1804,8 +1804,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:34:33",
-        "end_time": "20:34:33",
+        "start_time": "20:53:19",
+        "end_time": "20:53:19",
         "error_detail": ""
       },
       {
@@ -1874,8 +1874,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:30",
-        "end_time": "20:37:30",
+        "start_time": "20:56:04",
+        "end_time": "20:56:04",
         "error_detail": ""
       },
       {
@@ -2140,8 +2140,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:36:52",
-        "end_time": "20:36:52",
+        "start_time": "20:55:27",
+        "end_time": "20:55:27",
         "error_detail": ""
       },
       {
@@ -2210,8 +2210,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:30",
-        "end_time": "20:37:30",
+        "start_time": "20:56:04",
+        "end_time": "20:56:04",
         "error_detail": ""
       },
       {
@@ -2266,8 +2266,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:38:01",
-        "end_time": "20:38:02",
+        "start_time": "20:52:32",
+        "end_time": "20:52:32",
         "error_detail": ""
       },
       {
@@ -2294,8 +2294,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:46",
-        "end_time": "20:37:46",
+        "start_time": "20:52:10",
+        "end_time": "20:52:10",
         "error_detail": ""
       },
       {
@@ -2644,8 +2644,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:34:32",
-        "end_time": "20:34:33",
+        "start_time": "20:53:19",
+        "end_time": "20:53:19",
         "error_detail": ""
       },
       {
@@ -2840,8 +2840,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:34:31",
-        "end_time": "20:34:31",
+        "start_time": "20:53:18",
+        "end_time": "20:53:18",
         "error_detail": ""
       },
       {
@@ -3050,8 +3050,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:36:39",
-        "end_time": "20:36:40",
+        "start_time": "20:55:15",
+        "end_time": "20:55:15",
         "error_detail": ""
       },
       {
@@ -3568,8 +3568,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:34:34",
-        "end_time": "20:34:34",
+        "start_time": "20:53:20",
+        "end_time": "20:53:20",
         "error_detail": ""
       },
       {
@@ -3652,8 +3652,8 @@
         "status": "unavailable",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "20:34:29",
-        "end_time": "20:34:31",
+        "start_time": "20:53:16",
+        "end_time": "20:53:18",
         "error_detail": "ERROR: [youtube] rgr2tXWDNXI: Video unavailable. This video is not available"
       },
       {
@@ -3694,8 +3694,8 @@
         "status": "unavailable",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "20:34:26",
-        "end_time": "20:34:29",
+        "start_time": "20:53:13",
+        "end_time": "20:53:16",
         "error_detail": "ERROR: [youtube] tIi-j2JzZEA: Video unavailable. This video is not available"
       },
       {
@@ -3764,8 +3764,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:38:00",
-        "end_time": "20:38:00",
+        "start_time": "20:52:27",
+        "end_time": "20:52:28",
         "error_detail": ""
       },
       {
@@ -5318,8 +5318,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:37:46",
-        "end_time": "20:37:46",
+        "start_time": "20:52:12",
+        "end_time": "20:52:12",
         "error_detail": ""
       },
       {
@@ -5850,8 +5850,8 @@
         "status": "skipped",
         "percentage": 100.0,
         "speed": "--",
-        "start_time": "20:34:03",
-        "end_time": "20:34:03",
+        "start_time": "20:52:52",
+        "end_time": "20:52:53",
         "error_detail": ""
       },
       {
@@ -5973,12 +5973,12 @@
         "duration": 279,
         "thumbnail": "https://i.ytimg.com/vi/G3j4ZoXa1zs/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=G3j4ZoXa1zs",
-        "status": "queued",
+        "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
-        "error_detail": ""
+        "start_time": "20:53:03",
+        "end_time": "20:53:13",
+        "error_detail": "ERROR: [youtube] G3j4ZoXa1zs: This video is only available to Music Premium members"
       },
       {
         "id": "Ad5qG5qWdLY",
@@ -6463,12 +6463,12 @@
         "duration": 311,
         "thumbnail": "https://i.ytimg.com/vi/UDM3e6QDd_4/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=UDM3e6QDd_4",
-        "status": "queued",
+        "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
-        "error_detail": ""
+        "start_time": "20:53:41",
+        "end_time": "20:53:50",
+        "error_detail": "ERROR: [youtube] UDM3e6QDd_4: This video is only available to Music Premium members"
       },
       {
         "id": "dUD5YA2Wh5g",
@@ -7866,8 +7866,8 @@
         "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "20:36:05",
-        "end_time": "20:36:16",
+        "start_time": "20:54:43",
+        "end_time": "20:54:53",
         "error_detail": "ERROR: [youtube] 98vLPoOSMpc: This video is only available to Music Premium members"
       },
       {
@@ -7880,8 +7880,8 @@
         "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "20:36:52",
-        "end_time": "20:37:03",
+        "start_time": "20:55:28",
+        "end_time": "20:55:38",
         "error_detail": "ERROR: [youtube] Ze87r1ouZTw: This video is only available to Music Premium members"
       },
       {
@@ -7894,8 +7894,8 @@
         "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "20:37:47",
-        "end_time": "20:37:58",
+        "start_time": "20:52:12",
+        "end_time": "20:52:23",
         "error_detail": "ERROR: [youtube] qKaQUws-85U: This video is only available to Music Premium members"
       },
       {
@@ -7908,8 +7908,8 @@
         "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "20:37:03",
-        "end_time": "20:37:14",
+        "start_time": "20:55:38",
+        "end_time": "20:55:49",
         "error_detail": "ERROR: [youtube] QfEgVaut_Rw: This video is only available to Music Premium members"
       },
       {
@@ -7922,8 +7922,8 @@
         "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "20:35:53",
+        "start_time": "20:54:22",
+        "end_time": "20:54:32",
         "error_detail": "ERROR: [youtube] pYf7WhPW7Zc: This video is only available to Music Premium members"
       },
       {
@@ -7933,12 +7933,12 @@
         "duration": 274,
         "thumbnail": "https://i.ytimg.com/vi/2Ua2hRgV2I0/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=2Ua2hRgV2I0",
-        "status": "queued",
+        "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
-        "error_detail": ""
+        "start_time": "20:52:42",
+        "end_time": "20:52:52",
+        "error_detail": "ERROR: [youtube] 2Ua2hRgV2I0: This video is only available to Music Premium members"
       },
       {
         "id": "Arvv4uu3Z1E",
@@ -7947,12 +7947,12 @@
         "duration": 302,
         "thumbnail": "https://i.ytimg.com/vi/Arvv4uu3Z1E/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=Arvv4uu3Z1E",
-        "status": "queued",
+        "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
-        "error_detail": ""
+        "start_time": "20:53:20",
+        "end_time": "20:53:30",
+        "error_detail": "ERROR: [youtube] Arvv4uu3Z1E: This video is only available to Music Premium members"
       },
       {
         "id": "2ziOnXXjRfQ",
@@ -8440,8 +8440,8 @@
         "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "20:37:14",
-        "end_time": "20:37:24",
+        "start_time": "20:55:50",
+        "end_time": "20:56:00",
         "error_detail": "ERROR: [youtube] EPgbSblfrhI: This video is only available to Music Premium members"
       },
       {
@@ -8451,12 +8451,12 @@
         "duration": 311,
         "thumbnail": "https://i.ytimg.com/vi/FuAclHhGW6o/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=FuAclHhGW6o",
-        "status": "queued",
+        "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
-        "error_detail": ""
+        "start_time": "20:53:51",
+        "end_time": "20:54:01",
+        "error_detail": "ERROR: [youtube] FuAclHhGW6o: This video is only available to Music Premium members"
       },
       {
         "id": "eqsNd6YMnRU",
@@ -8465,12 +8465,12 @@
         "duration": 277,
         "thumbnail": "https://i.ytimg.com/vi/eqsNd6YMnRU/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=eqsNd6YMnRU",
-        "status": "queued",
+        "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
-        "error_detail": ""
+        "start_time": "20:52:53",
+        "end_time": "20:53:03",
+        "error_detail": "ERROR: [youtube] eqsNd6YMnRU: This video is only available to Music Premium members"
       },
       {
         "id": "SMSoLjA9WMY",
@@ -8479,12 +8479,12 @@
         "duration": 311,
         "thumbnail": "https://i.ytimg.com/vi/SMSoLjA9WMY/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=SMSoLjA9WMY",
-        "status": "queued",
+        "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
-        "error_detail": ""
+        "start_time": "20:54:01",
+        "end_time": "20:54:11",
+        "error_detail": "ERROR: [youtube] SMSoLjA9WMY: This video is only available to Music Premium members"
       },
       {
         "id": "lcozM9A6Y14",
@@ -8496,8 +8496,8 @@
         "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "20:37:34",
-        "end_time": "20:37:46",
+        "start_time": "20:51:59",
+        "end_time": "20:52:10",
         "error_detail": "ERROR: [youtube] lcozM9A6Y14: This video is only available to Music Premium members"
       },
       {
@@ -8507,12 +8507,12 @@
         "duration": 269,
         "thumbnail": "https://i.ytimg.com/vi/DfcSu7nUvok/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=DfcSu7nUvok",
-        "status": "downloading",
+        "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "20:38:02",
-        "end_time": "--",
-        "error_detail": ""
+        "start_time": "20:52:32",
+        "end_time": "20:52:42",
+        "error_detail": "ERROR: [youtube] DfcSu7nUvok: This video is only available to Music Premium members"
       },
       {
         "id": "8U5TuPD4P6M",
@@ -8521,12 +8521,12 @@
         "duration": 317,
         "thumbnail": "https://i.ytimg.com/vi/8U5TuPD4P6M/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=8U5TuPD4P6M",
-        "status": "queued",
+        "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
-        "error_detail": ""
+        "start_time": "20:54:11",
+        "end_time": "20:54:22",
+        "error_detail": "ERROR: [youtube] 8U5TuPD4P6M: This video is only available to Music Premium members"
       },
       {
         "id": "nCRVvA027Ps",
@@ -10106,8 +10106,8 @@
         "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "20:36:29",
-        "end_time": "20:36:39",
+        "start_time": "20:55:04",
+        "end_time": "20:55:15",
         "error_detail": "ERROR: [youtube] PBEAxWdD1ko: This video is only available to Music Premium members"
       },
       {
@@ -10120,8 +10120,8 @@
         "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "20:36:41",
-        "end_time": "20:36:51",
+        "start_time": "20:55:16",
+        "end_time": "20:55:26",
         "error_detail": "ERROR: [youtube] p3Bt53dkzb4: This video is only available to Music Premium members"
       },
       {
@@ -10134,8 +10134,8 @@
         "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "20:35:53",
-        "end_time": "20:36:03",
+        "start_time": "20:54:32",
+        "end_time": "20:54:42",
         "error_detail": "ERROR: [youtube] JNx7spqW0Uw: This video is only available to Music Premium members"
       },
       {
@@ -10148,8 +10148,8 @@
         "status": "error",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "20:36:17",
-        "end_time": "20:36:28",
+        "start_time": "20:54:53",
+        "end_time": "20:55:04",
         "error_detail": "ERROR: [youtube] 0vviQLA4mWs: This video is only available to Music Premium members"
       },
       {
@@ -14860,9 +14860,9 @@
     "url": "https://www.youtube.com/watch?v=O2K0ptoYpuc&list=PLcqF0SS4XiHHbZiSfU8HXtVZJ5DCkAnFT",
     "timestamp": "2026-07-03T22:04:56.023513",
     "total_tracks": 61,
-    "completed_tracks": 0,
-    "success_count": 0,
-    "failure_count": 0,
+    "completed_tracks": 61,
+    "success_count": 60,
+    "failure_count": 1,
     "is_playlist": true,
     "format": "audio",
     "quality": "highest",
@@ -14876,11 +14876,11 @@
         "duration": 3798,
         "thumbnail": "https://i.ytimg.com/vi/O2K0ptoYpuc/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=O2K0ptoYpuc",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:53",
+        "end_time": "20:56:54",
         "error_detail": ""
       },
       {
@@ -14890,11 +14890,11 @@
         "duration": 507,
         "thumbnail": "https://i.ytimg.com/vi/4yv4ea1pFp4/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=4yv4ea1pFp4",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:44",
+        "end_time": "20:56:45",
         "error_detail": ""
       },
       {
@@ -14904,11 +14904,11 @@
         "duration": 808,
         "thumbnail": "https://i.ytimg.com/vi/gKEuDEtmy_c/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=gKEuDEtmy_c",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:47",
+        "end_time": "20:56:47",
         "error_detail": ""
       },
       {
@@ -14918,11 +14918,11 @@
         "duration": 194,
         "thumbnail": "https://i.ytimg.com/vi/rDLKLLKJowY/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=rDLKLLKJowY",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:37",
+        "end_time": "20:56:37",
         "error_detail": ""
       },
       {
@@ -14932,11 +14932,11 @@
         "duration": 1820,
         "thumbnail": "https://i.ytimg.com/vi/O7QP_QdoNqU/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=O7QP_QdoNqU",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:51",
+        "end_time": "20:56:52",
         "error_detail": ""
       },
       {
@@ -14946,11 +14946,11 @@
         "duration": 846,
         "thumbnail": "https://i.ytimg.com/vi/2Ub98vlXPcg/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=2Ub98vlXPcg",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:48",
+        "end_time": "20:56:48",
         "error_detail": ""
       },
       {
@@ -14960,11 +14960,11 @@
         "duration": 526,
         "thumbnail": "https://i.ytimg.com/vi/UEWCCSuHsuQ/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=UEWCCSuHsuQ",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:45",
+        "end_time": "20:56:45",
         "error_detail": ""
       },
       {
@@ -14974,11 +14974,11 @@
         "duration": 4551,
         "thumbnail": "https://i.ytimg.com/vi/IhfsKWLDf7A/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=IhfsKWLDf7A",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:55",
+        "end_time": "20:56:55",
         "error_detail": ""
       },
       {
@@ -14988,11 +14988,11 @@
         "duration": 7310,
         "thumbnail": "https://i.ytimg.com/vi/ABy95341Dto/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=ABy95341Dto",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:57",
+        "end_time": "20:56:57",
         "error_detail": ""
       },
       {
@@ -15002,11 +15002,11 @@
         "duration": 32948,
         "thumbnail": "https://i.ytimg.com/vi/ST56ATKfgfs/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=ST56ATKfgfs",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:57:00",
+        "end_time": "20:57:00",
         "error_detail": ""
       },
       {
@@ -15016,11 +15016,11 @@
         "duration": 20735,
         "thumbnail": "https://i.ytimg.com/vi/N7v2bMUN5n4/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=N7v2bMUN5n4",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:59",
+        "end_time": "20:56:59",
         "error_detail": ""
       },
       {
@@ -15030,11 +15030,11 @@
         "duration": 10925,
         "thumbnail": "https://i.ytimg.com/vi/F7H_9D8Co7U/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=F7H_9D8Co7U",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:58",
+        "end_time": "20:56:58",
         "error_detail": ""
       },
       {
@@ -15044,11 +15044,11 @@
         "duration": 10634,
         "thumbnail": "https://i.ytimg.com/vi/R4W8j9dvjPk/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=R4W8j9dvjPk",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:57",
+        "end_time": "20:56:58",
         "error_detail": ""
       },
       {
@@ -15058,11 +15058,11 @@
         "duration": 11011,
         "thumbnail": "https://i.ytimg.com/vi/Jc3jwW1-3Zg/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=Jc3jwW1-3Zg",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:58",
+        "end_time": "20:56:58",
         "error_detail": ""
       },
       {
@@ -15072,11 +15072,11 @@
         "duration": 21628,
         "thumbnail": "https://i.ytimg.com/vi/YNdFu6bnhfU/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=YNdFu6bnhfU",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:59",
+        "end_time": "20:56:59",
         "error_detail": ""
       },
       {
@@ -15086,11 +15086,11 @@
         "duration": 4271,
         "thumbnail": "https://i.ytimg.com/vi/hXdmYhb8oFs/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=hXdmYhb8oFs",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:54",
+        "end_time": "20:56:54",
         "error_detail": ""
       },
       {
@@ -15100,12 +15100,12 @@
         "duration": 0,
         "thumbnail": "https://i.ytimg.com/vi/Re5h3EetEjw/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=Re5h3EetEjw",
-        "status": "queued",
+        "status": "unavailable",
         "percentage": 0.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
-        "error_detail": ""
+        "start_time": "21:00:02",
+        "end_time": "21:00:03",
+        "error_detail": "ERROR: [youtube] Re5h3EetEjw: Private video. Sign in if you've been granted access to this video. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies"
       },
       {
         "id": "PszSx4HvKAA",
@@ -15114,11 +15114,11 @@
         "duration": 21622,
         "thumbnail": "https://i.ytimg.com/vi/PszSx4HvKAA/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=PszSx4HvKAA",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:59",
+        "end_time": "20:56:59",
         "error_detail": ""
       },
       {
@@ -15128,11 +15128,11 @@
         "duration": 10021,
         "thumbnail": "https://i.ytimg.com/vi/pWZcF9Y5gDs/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=pWZcF9Y5gDs",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:57",
+        "end_time": "20:56:57",
         "error_detail": ""
       },
       {
@@ -15142,11 +15142,11 @@
         "duration": 4275,
         "thumbnail": "https://i.ytimg.com/vi/M7DMjECzVOQ/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=M7DMjECzVOQ",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:54",
+        "end_time": "20:56:54",
         "error_detail": ""
       },
       {
@@ -15156,11 +15156,11 @@
         "duration": 1444,
         "thumbnail": "https://i.ytimg.com/vi/DfYVKI2GGP0/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=DfYVKI2GGP0",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:50",
+        "end_time": "20:56:50",
         "error_detail": ""
       },
       {
@@ -15170,11 +15170,11 @@
         "duration": 176,
         "thumbnail": "https://i.ytimg.com/vi/OZns3JAocyg/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=OZns3JAocyg",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:37",
+        "end_time": "20:56:37",
         "error_detail": ""
       },
       {
@@ -15184,11 +15184,11 @@
         "duration": 3439,
         "thumbnail": "https://i.ytimg.com/vi/ohACeQcYHK4/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=ohACeQcYHK4",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:52",
+        "end_time": "20:56:52",
         "error_detail": ""
       },
       {
@@ -15198,11 +15198,11 @@
         "duration": 7205,
         "thumbnail": "https://i.ytimg.com/vi/RIRRQw4RTDo/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=RIRRQw4RTDo",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:56",
+        "end_time": "20:56:56",
         "error_detail": ""
       },
       {
@@ -15212,11 +15212,11 @@
         "duration": 3598,
         "thumbnail": "https://i.ytimg.com/vi/dqRnZWrHhEI/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=dqRnZWrHhEI",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:53",
+        "end_time": "20:56:53",
         "error_detail": ""
       },
       {
@@ -15226,11 +15226,11 @@
         "duration": 3626,
         "thumbnail": "https://i.ytimg.com/vi/91iGTV2HNbY/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=91iGTV2HNbY",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:53",
+        "end_time": "20:56:53",
         "error_detail": ""
       },
       {
@@ -15240,11 +15240,11 @@
         "duration": 209,
         "thumbnail": "https://i.ytimg.com/vi/dligzuMCSqo/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=dligzuMCSqo",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:38",
+        "end_time": "20:56:38",
         "error_detail": ""
       },
       {
@@ -15254,11 +15254,11 @@
         "duration": 259,
         "thumbnail": "https://i.ytimg.com/vi/Oh7aGl7B-ts/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=Oh7aGl7B-ts",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:43",
+        "end_time": "20:56:43",
         "error_detail": ""
       },
       {
@@ -15268,11 +15268,11 @@
         "duration": 209,
         "thumbnail": "https://i.ytimg.com/vi/2CBtdbJ44hI/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=2CBtdbJ44hI",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:38",
+        "end_time": "20:56:38",
         "error_detail": ""
       },
       {
@@ -15282,11 +15282,11 @@
         "duration": 209,
         "thumbnail": "https://i.ytimg.com/vi/F06WJzqNCFI/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=F06WJzqNCFI",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:39",
+        "end_time": "20:56:39",
         "error_detail": ""
       },
       {
@@ -15296,11 +15296,11 @@
         "duration": 209,
         "thumbnail": "https://i.ytimg.com/vi/KEVa_GGGJ1M/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=KEVa_GGGJ1M",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:39",
+        "end_time": "20:56:39",
         "error_detail": ""
       },
       {
@@ -15310,11 +15310,11 @@
         "duration": 209,
         "thumbnail": "https://i.ytimg.com/vi/WE3HGyfH_jc/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=WE3HGyfH_jc",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:39",
+        "end_time": "20:56:39",
         "error_detail": ""
       },
       {
@@ -15324,11 +15324,11 @@
         "duration": 209,
         "thumbnail": "https://i.ytimg.com/vi/0lJ5LbERkjU/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=0lJ5LbERkjU",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:40",
+        "end_time": "20:56:40",
         "error_detail": ""
       },
       {
@@ -15338,11 +15338,11 @@
         "duration": 209,
         "thumbnail": "https://i.ytimg.com/vi/oIGQqM7HGEo/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=oIGQqM7HGEo",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:40",
+        "end_time": "20:56:40",
         "error_detail": ""
       },
       {
@@ -15352,11 +15352,11 @@
         "duration": 247,
         "thumbnail": "https://i.ytimg.com/vi/DTPknUXOgCI/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=DTPknUXOgCI",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:43",
+        "end_time": "20:56:43",
         "error_detail": ""
       },
       {
@@ -15366,11 +15366,11 @@
         "duration": 209,
         "thumbnail": "https://i.ytimg.com/vi/gGMHvk3e-qA/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=gGMHvk3e-qA",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:40",
+        "end_time": "20:56:40",
         "error_detail": ""
       },
       {
@@ -15380,11 +15380,11 @@
         "duration": 261,
         "thumbnail": "https://i.ytimg.com/vi/Fb0Nk0bzkwM/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=Fb0Nk0bzkwM",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:44",
+        "end_time": "20:56:44",
         "error_detail": ""
       },
       {
@@ -15394,11 +15394,11 @@
         "duration": 268,
         "thumbnail": "https://i.ytimg.com/vi/94ySwIb-iIo/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=94ySwIb-iIo",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:44",
+        "end_time": "20:56:44",
         "error_detail": ""
       },
       {
@@ -15408,11 +15408,11 @@
         "duration": 213,
         "thumbnail": "https://i.ytimg.com/vi/a8KV61TMbHY/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=a8KV61TMbHY",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:41",
+        "end_time": "20:56:41",
         "error_detail": ""
       },
       {
@@ -15422,11 +15422,11 @@
         "duration": 233,
         "thumbnail": "https://i.ytimg.com/vi/nTTli0LTEVU/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=nTTli0LTEVU",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:42",
+        "end_time": "20:56:43",
         "error_detail": ""
       },
       {
@@ -15436,11 +15436,11 @@
         "duration": 199,
         "thumbnail": "https://i.ytimg.com/vi/SZrb0JecUMc/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=SZrb0JecUMc",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:37",
+        "end_time": "20:56:38",
         "error_detail": ""
       },
       {
@@ -15450,11 +15450,11 @@
         "duration": 223,
         "thumbnail": "https://i.ytimg.com/vi/y1JdWvUDdwY/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=y1JdWvUDdwY",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:42",
+        "end_time": "20:56:42",
         "error_detail": ""
       },
       {
@@ -15464,11 +15464,11 @@
         "duration": 219,
         "thumbnail": "https://i.ytimg.com/vi/t9tuLveHT28/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=t9tuLveHT28",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:42",
+        "end_time": "20:56:42",
         "error_detail": ""
       },
       {
@@ -15478,11 +15478,11 @@
         "duration": 209,
         "thumbnail": "https://i.ytimg.com/vi/u0rk5KZaNfw/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=u0rk5KZaNfw",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:41",
+        "end_time": "20:56:41",
         "error_detail": ""
       },
       {
@@ -15492,11 +15492,11 @@
         "duration": 220,
         "thumbnail": "https://i.ytimg.com/vi/uov6gapmEE8/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=uov6gapmEE8",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:42",
+        "end_time": "20:56:42",
         "error_detail": ""
       },
       {
@@ -15506,11 +15506,11 @@
         "duration": 209,
         "thumbnail": "https://i.ytimg.com/vi/ziBeoJ3lXgY/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=ziBeoJ3lXgY",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:41",
+        "end_time": "20:56:41",
         "error_detail": ""
       },
       {
@@ -15520,11 +15520,11 @@
         "duration": 2619,
         "thumbnail": "https://i.ytimg.com/vi/LxEcI9uto2g/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=LxEcI9uto2g",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:52",
+        "end_time": "20:56:52",
         "error_detail": ""
       },
       {
@@ -15534,11 +15534,11 @@
         "duration": 62,
         "thumbnail": "https://i.ytimg.com/vi/X0S9WV9NvIE/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=X0S9WV9NvIE",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:36",
+        "end_time": "20:56:36",
         "error_detail": ""
       },
       {
@@ -15548,11 +15548,11 @@
         "duration": 3558,
         "thumbnail": "https://i.ytimg.com/vi/509NqwF7I30/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=509NqwF7I30",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:52",
+        "end_time": "20:56:53",
         "error_detail": ""
       },
       {
@@ -15562,11 +15562,11 @@
         "duration": 649,
         "thumbnail": "https://i.ytimg.com/vi/giWPDVSby04/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=giWPDVSby04",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:46",
+        "end_time": "20:56:46",
         "error_detail": ""
       },
       {
@@ -15576,11 +15576,11 @@
         "duration": 790,
         "thumbnail": "https://i.ytimg.com/vi/cM5engqWutc/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=cM5engqWutc",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:47",
+        "end_time": "20:56:47",
         "error_detail": ""
       },
       {
@@ -15590,11 +15590,11 @@
         "duration": 1698,
         "thumbnail": "https://i.ytimg.com/vi/9ABZJSnzbHw/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=9ABZJSnzbHw",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:51",
+        "end_time": "20:56:51",
         "error_detail": ""
       },
       {
@@ -15604,11 +15604,11 @@
         "duration": 1184,
         "thumbnail": "https://i.ytimg.com/vi/cZHxLGSk_rM/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=cZHxLGSk_rM",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:49",
+        "end_time": "20:56:49",
         "error_detail": ""
       },
       {
@@ -15618,11 +15618,11 @@
         "duration": 991,
         "thumbnail": "https://i.ytimg.com/vi/CWVGaWF8gvU/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=CWVGaWF8gvU",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:48",
+        "end_time": "20:56:48",
         "error_detail": ""
       },
       {
@@ -15632,11 +15632,11 @@
         "duration": 745,
         "thumbnail": "https://i.ytimg.com/vi/0IOQlqxk7H4/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=0IOQlqxk7H4",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:46",
+        "end_time": "20:56:46",
         "error_detail": ""
       },
       {
@@ -15646,11 +15646,11 @@
         "duration": 1264,
         "thumbnail": "https://i.ytimg.com/vi/poCFI-UM6lk/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=poCFI-UM6lk",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:50",
+        "end_time": "20:56:50",
         "error_detail": ""
       },
       {
@@ -15660,11 +15660,11 @@
         "duration": 581,
         "thumbnail": "https://i.ytimg.com/vi/ty-0PEq2j84/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=ty-0PEq2j84",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:45",
+        "end_time": "20:56:45",
         "error_detail": ""
       },
       {
@@ -15674,11 +15674,11 @@
         "duration": 1209,
         "thumbnail": "https://i.ytimg.com/vi/qU1tQx8XDfo/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=qU1tQx8XDfo",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:49",
+        "end_time": "20:56:49",
         "error_detail": ""
       },
       {
@@ -15688,11 +15688,11 @@
         "duration": 1638,
         "thumbnail": "https://i.ytimg.com/vi/TgpLksm6oq8/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=TgpLksm6oq8",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:51",
+        "end_time": "20:56:51",
         "error_detail": ""
       },
       {
@@ -15702,11 +15702,11 @@
         "duration": 1171,
         "thumbnail": "https://i.ytimg.com/vi/pzPpMGiYyHw/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=pzPpMGiYyHw",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:48",
+        "end_time": "20:56:49",
         "error_detail": ""
       },
       {
@@ -15716,14 +15716,79 @@
         "duration": 625,
         "thumbnail": "https://i.ytimg.com/vi/M2uUrGnoC7M/hqdefault.jpg",
         "url": "https://www.youtube.com/watch?v=M2uUrGnoC7M",
-        "status": "queued",
-        "percentage": 0.0,
+        "status": "skipped",
+        "percentage": 100.0,
         "speed": "--",
-        "start_time": "--",
-        "end_time": "--",
+        "start_time": "20:56:46",
+        "end_time": "20:56:46",
         "error_detail": ""
       }
-    ]
+    ],
+    "last_played_track_id": "509NqwF7I30",
+    "last_played_shuffle": true,
+    "shuffle_order": [
+      "509NqwF7I30",
+      "N7v2bMUN5n4",
+      "t9tuLveHT28",
+      "uov6gapmEE8",
+      "SZrb0JecUMc",
+      "dligzuMCSqo",
+      "ty-0PEq2j84",
+      "M2uUrGnoC7M",
+      "u0rk5KZaNfw",
+      "rDLKLLKJowY",
+      "poCFI-UM6lk",
+      "WE3HGyfH_jc",
+      "oIGQqM7HGEo",
+      "a8KV61TMbHY",
+      "DTPknUXOgCI",
+      "F7H_9D8Co7U",
+      "DfYVKI2GGP0",
+      "0lJ5LbERkjU",
+      "qU1tQx8XDfo",
+      "cZHxLGSk_rM",
+      "CWVGaWF8gvU",
+      "OZns3JAocyg",
+      "y1JdWvUDdwY",
+      "91iGTV2HNbY",
+      "cM5engqWutc",
+      "0IOQlqxk7H4",
+      "9ABZJSnzbHw",
+      "M7DMjECzVOQ",
+      "R4W8j9dvjPk",
+      "Oh7aGl7B-ts",
+      "gGMHvk3e-qA",
+      "F06WJzqNCFI",
+      "2Ub98vlXPcg",
+      "X0S9WV9NvIE",
+      "nTTli0LTEVU",
+      "LxEcI9uto2g",
+      "ABy95341Dto",
+      "PszSx4HvKAA",
+      "giWPDVSby04",
+      "pzPpMGiYyHw",
+      "dqRnZWrHhEI",
+      "hXdmYhb8oFs",
+      "ziBeoJ3lXgY",
+      "gKEuDEtmy_c",
+      "KEVa_GGGJ1M",
+      "RIRRQw4RTDo",
+      "Jc3jwW1-3Zg",
+      "O2K0ptoYpuc",
+      "O7QP_QdoNqU",
+      "2CBtdbJ44hI",
+      "ohACeQcYHK4",
+      "TgpLksm6oq8",
+      "YNdFu6bnhfU",
+      "Fb0Nk0bzkwM",
+      "4yv4ea1pFp4",
+      "94ySwIb-iIo",
+      "pWZcF9Y5gDs",
+      "UEWCCSuHsuQ",
+      "ST56ATKfgfs",
+      "IhfsKWLDf7A"
+    ],
+    "shuffle_index": 0
   },
   {
     "id": "job_1783133096",

@@ -307,3 +307,30 @@ the right weekday two days out, a past-dated once-entry never fired.
 
 Issue #13 is now effectively answered for the panel space (schedule status);
 weather/stats can still be revisited separately.
+
+### Post-merge correction: hero layout regression (fixed in 4293e9d)
+
+`1d425db` shipped a broken hero layout for a short window. The edit that
+swapped the `#utilityPanel` placeholder for the Auto Play panel replaced only
+the panel's **opening** tag, leaving the old placeholder text and its `</div>`
+behind. That extra `</div>` closed the hero `<section>` early, so
+`.dashboard-layout` (playlist sidebar + items grid) was absorbed into the
+player's grid row instead of rendering below it. Owner spotted it immediately.
+
+Fixed by deleting the two leftover lines. Verified afterwards by geometry, not
+just by behaviour:
+- `.hero-section` contains exactly `#playerControlsContainer` and
+  `#utilityPanel`; `hero.contains(.dashboard-layout)` is false
+- playlist sidebar top (311) >= player bottom (266), i.e. playlists sit below
+- whole document passes an `HTMLParser` tag-balance check: no unclosed tags,
+  no mismatched closers
+
+**Lesson for whoever works here next (it bit this session):** behavioural
+checks through `javascript_tool` are not sufficient for markup edits. When a
+partial-tag replacement is involved, assert DOM containment/geometry and run
+the tag-balance check. Screenshots were unavailable (Browser pane not
+displayed) and that was treated as an inconvenience rather than as the missing
+check — it was the one thing that would have caught this straight away.
+
+State at handover: `schedules.json` holds the owner's first real entry
+(Instruments, shuffle, daily 21:00-22:00), confirmed working on their side.
